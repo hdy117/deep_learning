@@ -13,6 +13,7 @@ device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 g_file_path=os.path.dirname(os.path.abspath(__file__))
 train_folder=os.path.join(g_file_path,"..","dataset","MNIST","mnist_train")
 test_folder=os.path.join(g_file_path,"..","dataset","MNIST","mnist_test")
+model_path=os.path.join(g_file_path,".",'model','vgg_7.onnx')
 
 # define dateset
 class MNISTDataset(Dataset):
@@ -165,5 +166,19 @@ if __name__=="__main__":
     print(f'train data path:{train_folder}')
     print(f'test data path:{test_folder}')
     train()
+
+    # save model
+    torch.onnx.export(
+        vgg_model,  # PyTorch model to be exported
+        torch.randn(size=[1, 28, 28],dtype=torch.float32).to(device),  # Sample input tensor
+        model_path,  # Path to save the ONNX model
+        export_params=True,  # Store the trained parameter weights inside the model file
+        opset_version=12,  # ONNX version to use
+        do_constant_folding=True,  # Whether to execute constant folding for optimization
+        input_names=['input'],  # Names to assign to the input tensors
+        output_names=['output'],  # Names to assign to the output tensors
+        dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}}  # Specify dynamic axes
+    )   
+
     test()
     
