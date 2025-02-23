@@ -1,0 +1,14 @@
+*.pdf
+*.pyc
+*.onnx
+*.jpg
+*.png
+*.jpeg
+*.txt
+*.tar.gz
+*.idea
+*.vscode
+build*
+onnx/*
+dataset/*
+ref/*
