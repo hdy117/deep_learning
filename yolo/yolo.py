@@ -10,6 +10,7 @@ import torchvision.transforms as transforms
 # file_path
 g_file_path=os.path.dirname(os.path.abspath(__file__))
 coco_train_dir=os.path.join(g_file_path, "..","dataset", "OpenDataLab___COCO_2017", 'raw')
+batch_size=20
 
 class COCODatasetResized(Dataset):
     def __init__(self, root, annotation, img_size=224,num_classes=80):
@@ -103,7 +104,7 @@ transform = transforms.Compose([
 
 train_dataset = COCODatasetResized(root=os.path.join(coco_train_dir,"Images",'train2017'), 
                                    annotation=os.path.join(coco_train_dir,'Annotations','annotations_trainval2017','annotations','instances_train2017.json'))
-train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
 
 class YoloLoss(nn.Module):
@@ -192,6 +193,8 @@ for epoch in range(num_epochs):
         loss = loss_fn(predictions, targets)
         loss.backward()
         optimizer.step()
+        
+        print(f'batch idx:{batch_idx}, Loss: {loss.item()}')
 
     print(f"Epoch {epoch+1}, Loss: {loss.item()}")
 
@@ -324,7 +327,7 @@ def compute_map(model, dataloader, iou_threshold=0.5, num_classes=80):
 # Load test dataset
 test_dataset = COCODatasetResized(root=os.path.join(coco_train_dir,"Images",'test2017'), 
                                    annotation=os.path.join(coco_train_dir,'Annotations','annotations_trainval2017','annotations','instances_test2017.json'))
-test_loader = DataLoader(test_dataset, batch_size=8, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
 # Compute mAP
 mAP = compute_map(model, test_loader)
