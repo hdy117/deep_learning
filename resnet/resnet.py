@@ -110,8 +110,9 @@ class ResidualBlock(nn.Module):
 
         out=self.conv2d_3(out)
         out=self.bn_3(out)
-        out=self.shortcut_bn(self.shortcut(x))+out # add x
         out=self.relu_3(out)
+
+        out=self.shortcut_bn(self.shortcut(x))+out # add x
 
         return out   
 
