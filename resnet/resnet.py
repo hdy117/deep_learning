@@ -13,7 +13,7 @@ device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 g_file_path=os.path.dirname(os.path.abspath(__file__))
 train_folder=os.path.join(g_file_path,"..","dataset","MNIST","mnist_train")
 test_folder=os.path.join(g_file_path,"..","dataset","MNIST","mnist_test")
-model_path=os.path.join(g_file_path,".",'model','vgg_7.onnx')
+model_path=os.path.join(g_file_path,".",'model','resnet.onnx')
 
 # define dateset
 class MNISTDataset(Dataset):
@@ -65,38 +65,75 @@ test_mnist_dataset=MNISTDataset(test_folder)
 test_dataloader=DataLoader(dataset=test_mnist_dataset,batch_size=100,shuffle=True)
 
 # define model
-class VGGBlock(nn.Module):
+class ResidualBlock(nn.Module):
     def __init__(self, in_channels:int, out_channels:int,kernel_size:int=3):
         super().__init__()
-        self.conv2d_1=nn.Conv2d(in_channels=in_channels,out_channels=out_channels,
+        
+        # input bn
+        self.bn_0=nn.BatchNorm2d(num_features=in_channels)
+        self.relu_0=nn.LeakyReLU()
+        
+        # conv 1x1 to reduce channels
+        self.conv2d_1=nn.Conv2d(in_channels=in_channels,out_channels=out_channels//2,
+                              kernel_size=1,padding=0)
+        self.bn_1=nn.BatchNorm2d(num_features=out_channels//2)
+        self.relu_1=nn.LeakyReLU()
+
+        # conv 3x3 to extract features
+        self.conv2d_2=nn.Conv2d(in_channels=out_channels//2,out_channels=out_channels,
                               kernel_size=kernel_size,padding=kernel_size//2)
-        self.relu=nn.LeakyReLU()
-        self.conv2d_2=nn.Conv2d(in_channels=out_channels,out_channels=out_channels,
-                              kernel_size=kernel_size,padding=kernel_size//2)
-        self.max_pool=nn.MaxPool2d(2,2)
+        self.bn_2=nn.BatchNorm2d(num_features=out_channels)
+        self.relu_2=nn.LeakyReLU()
+
+        # conv 1x1 to increase channels
+        self.conv2d_3=nn.Conv2d(in_channels=out_channels,out_channels=out_channels,
+                              kernel_size=1,padding=1//2)
+        self.bn_3=nn.BatchNorm2d(num_features=out_channels)
+        self.relu_3=nn.LeakyReLU()
+
+        # shortcut
+        self.shortcut=nn.Conv2d(in_channels=in_channels,out_channels=out_channels,
+                                kernel_size=1,padding=0)
+        self.shortcut_bn=nn.BatchNorm2d(num_features=out_channels)
     
     def forward(self, x):
-        out=self.conv2d_1(x)
-        out=self.relu(out)
+        out=self.bn_0(x)
+        out=self.relu_0(out)
+
+        out=self.conv2d_1(out)
+        out=self.bn_1(out)
+        out=self.relu_1(out)
+
         out=self.conv2d_2(out)
-        out=self.relu(out)
-        out=self.max_pool(out)
+        out=self.bn_2(out)
+        out=self.relu_2(out)
+
+        out=self.conv2d_3(out)
+        out=self.bn_3(out)
+        out=self.relu_3(out)
+
+        out=self.shortcut_bn(self.shortcut(x))+out
+
         return out   
 
-class VGG(nn.Module):
+class ResNet(nn.Module):
     def __init__(self,in_channel=1, out_channel=10):
         super().__init__()
-        self.vgg_1=VGGBlock(in_channels=1, out_channels=8) # 14
-        self.vgg_2=VGGBlock(in_channels=8, out_channels=16) # 7
-        self.vgg_3=VGGBlock(in_channels=16, out_channels=32) # 3
+        self.res_1=ResidualBlock(in_channels=1, out_channels=8) # 14
+        self.res_2=ResidualBlock(in_channels=8, out_channels=16) # 7
+        self.res_3=ResidualBlock(in_channels=16, out_channels=32) # 3
+        self.max_pool=nn.MaxPool2d(2,2)
         self.fc=nn.Linear(in_features=32*3*3, out_features=1024)
         self.relu=nn.LeakyReLU()
         self.fc_out=nn.Linear(in_features=1024, out_features=out_channel)
     
     def forward(self, x):
-        out=self.vgg_1(x)
-        out=self.vgg_2(out)
-        out=self.vgg_3(out)
+        out=self.res_1(x)
+        out=self.max_pool(out)
+        out=self.res_2(out)
+        out=self.max_pool(out)
+        out=self.res_3(out)
+        out=self.max_pool(out)
         out=out.view(-1, 32*3*3)
         out=self.fc(out)
         out=self.relu(out)
@@ -104,13 +141,13 @@ class VGG(nn.Module):
         return out
 
 # train
-vgg_model=VGG(in_channel=1, out_channel=10)
-vgg_model=vgg_model.to(device)
+res_model=ResNet(in_channel=1, out_channel=10)
+res_model=res_model.to(device)
 
 n_epoch=5
 learning_rate=0.001
 criterion=torch.nn.CrossEntropyLoss()
-optimizer=torch.optim.SGD(params=vgg_model.parameters(),lr=learning_rate)
+optimizer=torch.optim.SGD(params=res_model.parameters(),lr=learning_rate)
 
 
 def train():
@@ -125,7 +162,7 @@ def train():
             label=label.to(device)
 
             # predict
-            y_pred=vgg_model(sample)
+            y_pred=res_model(sample)
 
             # loss
             loss=criterion(y_pred, label)
@@ -153,7 +190,7 @@ def test():
             label=label.to(device)
 
             # predict
-            y_pred=vgg_model(sample)
+            y_pred=res_model(sample)
 
             # test
             _, y_pred_idx=torch.max(y_pred,1)
@@ -169,7 +206,7 @@ if __name__=="__main__":
 
     # save model
     torch.onnx.export(
-        vgg_model,  # PyTorch model to be exported
+        res_model,  # PyTorch model to be exported
         torch.randn(size=[1, 1, 28, 28],dtype=torch.float32).to(device),  # Sample input tensor
         model_path,  # Path to save the ONNX model
         export_params=True,  # Store the trained parameter weights inside the model file
