@@ -11,12 +11,12 @@ device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # file_path
 g_file_path=os.path.dirname(os.path.abspath(__file__))
-train_folder=os.path.join(g_file_path,"..","dataset","MNIST","mnist_train")
-test_folder=os.path.join(g_file_path,"..","dataset","MNIST","mnist_test")
-model_path=os.path.join(g_file_path,".",'model','resnet.onnx')
+train_folder=os.path.join(g_file_path,"..","dataset","OpenDataLab___COCO_2017","mnist_train")
+test_folder=os.path.join(g_file_path,"..","dataset","OpenDataLab___COCO_2017","mnist_test")
+model_path=os.path.join(g_file_path,".",'model','yolo.onnx')
 
 # define dateset
-class MNISTDataset(Dataset):
+class CoCoDataset(Dataset):
     def __init__(self, dataset_path:str, transform=None):
         super().__init__()
         self.dataset_path=dataset_path
@@ -58,10 +58,10 @@ class MNISTDataset(Dataset):
         return len(self.img_list)
 
 # define dataloader
-train_mnist_dataset=MNISTDataset(train_folder)
+train_mnist_dataset=CoCoDataset(train_folder)
 train_dataloader=DataLoader(dataset=train_mnist_dataset,batch_size=100,shuffle=True)
 
-test_mnist_dataset=MNISTDataset(test_folder)
+test_mnist_dataset=CoCoDataset(test_folder)
 test_dataloader=DataLoader(dataset=test_mnist_dataset,batch_size=100,shuffle=True)
 
 # define model
@@ -110,8 +110,9 @@ class ResidualBlock(nn.Module):
 
         out=self.conv2d_3(out)
         out=self.bn_3(out)
-        out=self.shortcut_bn(self.shortcut(x))+out # add x
         out=self.relu_3(out)
+
+        out=self.shortcut_bn(self.shortcut(x))+out
 
         return out   
 
