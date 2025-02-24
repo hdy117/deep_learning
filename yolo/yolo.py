@@ -13,15 +13,15 @@ coco_train_dir=os.path.join(g_file_path, "..","dataset", "OpenDataLab___COCO_201
 batch_size=20
 
 class COCODatasetResized(Dataset):
-    def __init__(self, root, annotation, img_size=224,num_classes=80):
+    def __init__(self, root, annotation, img_size=224, num_classes=80):
         self.root = root
         self.coco = COCO(annotation)
         self.ids = list(self.coco.imgs.keys())
-        self.img_size = img_size  # Target size: 448x448
-        self.num_classes=num_classes
+        self.img_size = img_size
+        self.num_classes = num_classes
         self.transform = transforms.Compose([
             transforms.ToPILImage(),
-            transforms.Resize((img_size, img_size)),  
+            transforms.Resize((img_size, img_size)),
             transforms.ToTensor(),
         ])
 
@@ -35,66 +35,56 @@ class COCODatasetResized(Dataset):
 
         if not os.path.exists(image_path):
             print(f"Warning: Image {image_path} not found!")
-            return self.__getitem__((index + 1) % len(self.ids))  # Skip to next image
+            return self.__getitem__((index + 1) % len(self.ids))
 
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         orig_h, orig_w = image.shape[:2]
-
-        # Resize image
         image = cv2.resize(image, (self.img_size, self.img_size))
-        image = self.transform(image)  # Apply torchvision transforms
+        image = self.transform(image)
 
-        # Adjust bounding boxes
         label_matrix = self.encode_label(annotations, orig_w, orig_h)
 
         return image, label_matrix
 
     def encode_label(self, annotations, orig_w, orig_h):
-        label_matrix = torch.zeros((7, 7, 5*2 + self.num_classes))  # Supports COCO (5 + 80 = 85)
+        label_matrix = torch.zeros((7, 7, 2, 6))
 
-        # Get valid category IDs (COCO category mapping)
-        cat_ids = self.coco.getCatIds()  # Returns a sorted list of valid category IDs
+        cat_ids = self.coco.getCatIds()
         cat_id_to_index = {cat_id: idx for idx, cat_id in enumerate(cat_ids)}
 
         for ann in annotations:
             x, y, w, h = ann['bbox']
             class_label = ann['category_id']
 
-            # Ensure class label is valid
             if class_label not in cat_id_to_index:
-                continue  # Skip unknown categories
+                continue
 
-            class_label = cat_id_to_index[class_label]  # Convert to 0-based index
+            class_label = cat_id_to_index[class_label]
 
-            # Scale bounding box coordinates
             x_new = (x / orig_w) * self.img_size
             y_new = (y / orig_h) * self.img_size
             w_new = (w / orig_w) * self.img_size
             h_new = (h / orig_h) * self.img_size
 
-            # Compute grid cell indices
             grid_size = self.img_size / 7
             grid_x = int(x_new // grid_size)
             grid_y = int(y_new // grid_size)
 
-            # Normalize x, y within the grid cell
             x_rel = (x_new % grid_size) / grid_size
             y_rel = (y_new % grid_size) / grid_size
             w_rel = w_new / self.img_size
             h_rel = h_new / self.img_size
 
-            # Assign values to the label matrix
-            label_matrix[grid_y, grid_x, 0:4] = torch.tensor([x_rel, y_rel, w_rel, h_rel])
-            label_matrix[grid_y, grid_x, 4] = 1  # Objectness score
-            label_matrix[grid_y, grid_x, 5 + class_label] = 1  # One-hot class label
+            label_matrix[grid_y, grid_x, 0, :4] = torch.tensor([x_rel, y_rel, w_rel, h_rel])
+            label_matrix[grid_y, grid_x, 0, 4] = 1
+            label_matrix[grid_y, grid_x, 0, 5] = class_label
 
         return label_matrix
 
     def __len__(self):
         return len(self.ids)
-
 
 transform = transforms.Compose([
     transforms.ToPILImage(),
@@ -112,22 +102,16 @@ class YoloLoss(nn.Module):
         super(YoloLoss, self).__init__()
         self.lambda_coord = lambda_coord
         self.lambda_noobj = lambda_noobj
+        self.mse = nn.MSELoss()
+        self.bce_logistic = nn.BCEWithLogitsLoss()
+        self.cross_entropy = nn.CrossEntropyLoss()
 
     def forward(self, predictions, targets):
-        # Calculate coordinate loss (bounding box)
-        coord_loss = self.lambda_coord * torch.sum((predictions[..., 0:4] - targets[..., 0:4]) ** 2)
-        
-        # Calculate object loss (objectness score)
-        object_loss = torch.sum((predictions[..., 4] - targets[..., 4]) ** 2)
-        
-        # Calculate no-object loss (for empty grid cells)
-        no_object_loss = self.lambda_noobj * torch.sum((predictions[..., 4] - targets[..., 4]) ** 2)
-        
-        # Calculate class loss (class prediction)
-        class_loss = torch.sum((predictions[..., 5:] - targets[..., 5:]) ** 2)
-        
-        # Combine all losses
-        total_loss = coord_loss + object_loss + no_object_loss + class_loss
+        coord_loss = self.lambda_coord * self.mse(predictions[..., 0:2], targets[..., 0:2])
+        width_height_loss = self.mse(predictions[..., 2:4], targets[..., 2:4])
+        confidence_loss = self.bce_logistic(predictions[..., 4], targets[..., 4])
+        class_loss = self.cross_entropy(predictions[..., 5:].long(), targets[..., 5:].long())
+        total_loss = coord_loss + width_height_loss + confidence_loss + class_loss
         return total_loss
 
 
@@ -154,16 +138,16 @@ class YOLO(nn.Module):
             nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1),
             nn.LeakyReLU(0.1),
             nn.MaxPool2d(2, 2),
-            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(512, 1024, kernel_size=3, stride=1, padding=1),
             nn.LeakyReLU(0.1),
             nn.MaxPool2d(2, 2),
         )
         
         self.fc_layers = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(512 * grid_size * grid_size, 4096),
+            nn.Linear(1024 * grid_size * grid_size, 4096),
             nn.LeakyReLU(0.1),
-            nn.Linear(4096, grid_size * grid_size * (num_boxes * 5 + num_classes))
+            nn.Linear(4096, grid_size * grid_size * num_boxes * 6)
         )
         
         self.grid_size = grid_size
@@ -172,9 +156,8 @@ class YOLO(nn.Module):
 
     def forward(self, x):
         x = self.conv_layers(x)
-        # print("Conv output shape:", x.shape)  # Debugging
         x = self.fc_layers(x)
-        return x.view(-1, self.grid_size, self.grid_size, self.num_boxes * 5 + self.num_classes)
+        return x.view(-1, self.grid_size, self.grid_size, self.num_boxes, 6)
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -201,7 +184,7 @@ for epoch in range(num_epochs):
 model.eval()
 
 
-def yolo_to_bbox(yolo_output, img_size=448, grid_size=7, num_boxes=2, num_classes=80):
+def yolo_to_bbox(yolo_output, img_size=224, grid_size=7, num_boxes=2, num_classes=80):
     """
     Convert YOLO output (grid-based format) to bounding box coordinates in the original image scale.
     """
