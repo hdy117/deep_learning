@@ -112,7 +112,8 @@ class ResidualBlock(nn.Module):
         out=self.bn_3(out)
         out=self.relu_3(out)
 
-        out=self.shortcut_bn(self.shortcut(x))+out # add x
+        # out=self.shortcut_bn(self.shortcut(x))+out # add x
+        out=torch.cat((x, out), dim=1) # add x
 
         return out   
 
