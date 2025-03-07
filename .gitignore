@@ -11,4 +11,5 @@
 build*
 onnx/*
 dataset/*
+!dataset/coco_dataset.py
 ref/*

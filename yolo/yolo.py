@@ -2,11 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
-from pycocotools.coco import COCO
-import cv2
-import os
-import torchvision.transforms as transforms
-import numpy as np
+
 
 # file_path
 g_file_path=os.path.dirname(os.path.abspath(__file__))
