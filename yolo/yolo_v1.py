@@ -96,10 +96,6 @@ class COCODataset(Dataset):
             img_data=self.transform(img_data)
         return img_data, anno_infos
 
-
-
-
-
 # 4.0 model define
 class YOLO_V1(nn.Module):
     def __init__(self,input_channel=3, img_size=(224,224)):
@@ -114,35 +110,35 @@ class YOLO_V1(nn.Module):
             nn.LeakyReLU(0.1),
             nn.MaxPool2d(2,2),  # (192,56,56)
 
-            nn.Conv2d(input_channel=192,out_channels=128,kernel_size=1),
+            nn.Conv2d(in_channels=192,out_channels=128,kernel_size=1),
             nn.LeakyReLU(0.1),
-            nn.Conv2d(input_channel=128,out_channels=256,kernel_size=3,padding=1),
+            nn.Conv2d(in_channels=128,out_channels=256,kernel_size=3,padding=1),
             nn.LeakyReLU(0.1),
-            nn.Conv2d(input_channel=256,out_channels=256,kernel_size=1),
+            nn.Conv2d(in_channels=256,out_channels=256,kernel_size=1),
             nn.LeakyReLU(0.1),
-            nn.Conv2d(input_channel=256,out_channels=512,kernel_size=3,padding=1),
+            nn.Conv2d(in_channels=256,out_channels=512,kernel_size=3,padding=1),
             nn.LeakyReLU(0.1),
             nn.MaxPool2d(2,2),  # (512,28,28)
 
-            nn.Conv2d(input_channel=512,out_channels=256,kernel_size=1),
+            nn.Conv2d(in_channels=512,out_channels=256,kernel_size=1),
             nn.LeakyReLU(0.1),
-            nn.Conv2d(input_channel=256,out_channels=512,kernel_size=3,padding=1),
+            nn.Conv2d(in_channels=256,out_channels=512,kernel_size=3,padding=1),
             nn.LeakyReLU(0.1),
-            nn.Conv2d(input_channel=512,out_channels=512,kernel_size=1),
+            nn.Conv2d(in_channels=512,out_channels=512,kernel_size=1),
             nn.LeakyReLU(0.1),
-            nn.Conv2d(input_channel=512,out_channels=1024,kernel_size=3,padding=1),
+            nn.Conv2d(in_channels=512,out_channels=1024,kernel_size=3,padding=1),
             nn.LeakyReLU(0.1),
             nn.MaxPool2d(2,2),  # (1024,14,14)
 
-            nn.Conv2d(input_channel=1024,out_channels=512,kernel_size=1),
+            nn.Conv2d(in_channels=1024,out_channels=512,kernel_size=1),
             nn.LeakyReLU(0.1),
-            nn.Conv2d(input_channel=512,out_channels=1024,kernel_size=3,padding=1),
+            nn.Conv2d(in_channels=512,out_channels=1024,kernel_size=3,padding=1),
             nn.LeakyReLU(0.1),
-            nn.Conv2d(input_channel=1024,out_channels=512,kernel_size=1),
+            nn.Conv2d(in_channels=1024,out_channels=512,kernel_size=1),
             nn.LeakyReLU(0.1),
-            nn.Conv2d(input_channel=512,out_channels=1024,kernel_size=3,padding=1),
+            nn.Conv2d(in_channels=512,out_channels=1024,kernel_size=3,padding=1),
             nn.LeakyReLU(0.1),
-            nn.Conv2d(input_channel=1024,out_channels=1024,kernel_size=3,padding=1),
+            nn.Conv2d(in_channels=1024,out_channels=1024,kernel_size=3,padding=1),
             nn.LeakyReLU(0.1),
             nn.MaxPool2d(2,2),  # (1024,7,7)
         )
