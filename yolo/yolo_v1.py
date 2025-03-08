@@ -32,7 +32,7 @@ class HyperParam:
     # NUM_CLASS=int(90)
     NUM_CLASS=int(1)
     TARGET_CLASS_LABELS=[3] # 3 mean car
-    OUT_DIM=int(BBOX_SIZE+CONFIDENT_SIZE+NUM_CLASS) # output dim
+    OUT_DIM=int(NUM_CLASS+BBOX_SIZE+CONFIDENT_SIZE) # output dim
 
 # 1. prepare dataset
 class COCODataset(Dataset):
