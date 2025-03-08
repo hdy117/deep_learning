@@ -161,6 +161,9 @@ class COCOParser:
         # category
         train_catgory_ids=self.coco.getCatIds()
         print(f'train_catgory_ids:{train_catgory_ids}')
+        for category_id in train_catgory_ids:
+            category_info=self.get_category_info(category_id=category_id)
+            print(f'category_info:{category_info}')
 
         # num of images
         print(f'get_img_num:{self.get_img_num()}')

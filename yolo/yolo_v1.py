@@ -187,7 +187,7 @@ class YOLO_V1_Loss(nn.Module):
         target_bbox = labels[..., HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE] # Ground truth bounding box
 
         # mse loss function
-        mse=nn.MSELoss()
+        mse=nn.MSELoss(reduce='none')
 
         # if has obj or not
         lambda_obj=target_conf>=0.5
@@ -202,11 +202,6 @@ class YOLO_V1_Loss(nn.Module):
 
         # class loss
         loss_class=mse(pred_class,target_class)
-
-        # total loss
-        # loss=5.0*lambda_obj*loss_coord.sum()+lambda_obj*loss_confidence.sum()+\
-        #     0.5*lambda_noobj*loss_confidence.sum()+lambda_obj*loss_class.sum()
-        # loss=5.0*loss_coord+loss_confidence+loss_class
 
         # 有目标的损失
         loss_obj_coord = 5.0 * lambda_obj * loss_coord
