@@ -60,15 +60,15 @@ class ImgLabelResize:
         # padding_width
         padding_width_half=abs(new_size-origin_width*ratio)//2
         padding_height_half=abs(new_size-origin_height*ratio)//2
-        print(f'origin_width:{origin_width},origin_height:{origin_height}')
-        print(f'padding_width_half:{padding_width_half},padding_height_half:{padding_height_half}')
+        # print(f'origin_width:{origin_width},origin_height:{origin_height}')
+        # print(f'padding_width_half:{padding_width_half},padding_height_half:{padding_height_half}')
 
         # x,y,width,height
         x,y,width,height=bbox[0],bbox[1],bbox[2],bbox[3]
-        x=int(ratio*x+padding_width_half)
-        y=int(ratio*y+padding_height_half)
-        width=int(ratio*width)
-        height=int(ratio*height)
+        x=ratio*x+padding_width_half
+        y=ratio*y+padding_height_half
+        width=ratio*width
+        height=ratio*height
 
         return [x,y,width,height]
 
@@ -184,6 +184,7 @@ class COCOParser:
             print(f'category_id:{anno_info["category_id"]}, cat_info:{cat_info}')
             anno_info['bbox']=ImgLabelResize.label_resize(origin_width,origin_height,anno_info['bbox'],224)
             anno_info['segmentation']=[] # clear segmentation for now
+            print(f'bbox:{anno_info["bbox"]}')
 
         plt.imshow(img_data)
         self.coco.showAnns(anno_infos, draw_bbox=True)
