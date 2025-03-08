@@ -1,11 +1,6 @@
 import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
-from torchvision.transforms import transforms
-import os,sys
-import numpy as np
-import math
+from torch.utils.data import DataLoader
+import os
 
 from yolo_v1 import *
 
