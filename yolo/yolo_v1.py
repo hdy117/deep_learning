@@ -29,7 +29,8 @@ class HyperParam:
     GRID_SIZE=IMG_SIZE//S # size of grid
     BBOX_SIZE=int(4)
     CONFIDENT_SIZE=int(1) 
-    NUM_CLASS=int(90)
+    # NUM_CLASS=int(90)
+    NUM_CLASS=int(3)
     OUT_DIM=int(BBOX_SIZE+CONFIDENT_SIZE+NUM_CLASS) # output dim
 
 # 1. prepare dataset
@@ -65,10 +66,21 @@ class COCODataset(Dataset):
                 labels[i,j]=torch.zeros(HyperParam.OUT_DIM)
 
         for anno_info in anno_infos:
-            anno_info['bbox']=coco_dataset.ImgLabelResize.label_resize(width,height,anno_info['bbox'],self.img_new_size)
-            category_id=anno_info['category_id']
-            x,y,w,h=anno_info['bbox'][0],anno_info['bbox'][1],anno_info['bbox'][2],anno_info['bbox'][3]
             # label, [num_class,x,y,w,h,confidence]
+            # get annotation
+            anno_info['bbox']=coco_dataset.ImgLabelResize.label_resize(width,height,anno_info['bbox'],self.img_new_size)
+            
+            # get category id
+            category_id=anno_info['category_id']
+            
+            # only detect category less than or equal to HyperParam.NUM_CLASS
+            if category_id>HyperParam.NUM_CLASS:
+                continue
+            
+            # bounding box
+            x,y,w,h=anno_info['bbox'][0],anno_info['bbox'][1],anno_info['bbox'][2],anno_info['bbox'][3]
+            
+            # grid coordinate
             i,j=int(x//HyperParam.GRID_SIZE),int(y//HyperParam.GRID_SIZE)
 
             # num class
