@@ -54,6 +54,7 @@ class COCODataset(Dataset):
         img_id=self.coco_parser.get_img_id(img_info)
 
         # load and resize image
+        img_name=self.coco_parser.get_img_name(img_info=img_info)
         img_pil=self.coco_parser.load_img(self.coco_parser.get_img_name(img_info=img_info))
         width, height=img_pil.size
         img_pil=coco_dataset.ImgLabelResize.image_resize(img_pil,new_size=self.img_new_size)
@@ -150,7 +151,7 @@ class YOLO_V1(nn.Module):
             nn.Linear(in_features=512*14*14,out_features=2048),
             nn.LeakyReLU(0.1),
             nn.Linear(in_features=2048,out_features=2048),
-            nn.LeakyReLU(0.1),
+            nn.Tanh(),
             nn.Linear(in_features=2048,out_features=7*7*self.output_dim)
         )
 
