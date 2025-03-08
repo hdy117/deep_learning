@@ -45,7 +45,7 @@ def train():
             optimizer.step()
 
             # loss
-            if batch_idx%100==0:
+            if batch_idx%10==0:
                 print(f'epoch:{epoch}, batch idx:{batch_idx},loss:{loss.item()}')
 
         # update learning rate
