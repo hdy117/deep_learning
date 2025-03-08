@@ -189,21 +189,21 @@ class YOLO_V1_Loss(nn.Module):
         target_bbox = labels[..., HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE] # Ground truth bounding box
 
         # mse loss function
-        mse=nn.MSELoss(reduce='none')
+        mse=nn.MSELoss(reduction='none')
 
         # if has obj or not
         lambda_obj=target_conf>=0.5
         lambda_noobj=target_conf<0.5
 
         # coordinate loss
-        loss_coord=mse(pred_bbox[...,:2],target_bbox[...,:2])+mse(
+        loss_coord=mse(pred_bbox[...,:2],target_bbox[...,:2]).mean(-1)+mse(
             torch.sqrt(torch.abs(pred_bbox[..., 2:4]) + 1e-8),
-            torch.sqrt(torch.abs(target_bbox[..., 2:4]) + 1e-8)
-        )
+            torch.sqrt(torch.abs(target_bbox[..., 2:4]) + 1e-8)).mean(-1)
         loss_confidence=mse(pred_conf,target_conf)
+        # print(f'lambda_obj.shape:{lambda_obj.shape}, loss_coord.shape:{loss_coord.shape}, loss_confidence.shape:{loss_confidence.shape}')
 
         # class loss
-        loss_class=mse(pred_class,target_class)
+        loss_class=mse(pred_class,target_class).mean(-1)
 
         # 有目标的损失
         loss_obj_coord = 5.0 * lambda_obj * loss_coord
