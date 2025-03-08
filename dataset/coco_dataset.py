@@ -9,7 +9,7 @@ import numpy as np
 file_path=os.path.dirname(os.path.abspath(__file__))
 
 # coco root dir
-coco_root_dir=os.path.join(file_path,'dataset','OpenDataLab___COCO_2017','raw')
+coco_root_dir=os.path.join(file_path,'OpenDataLab___COCO_2017','raw')
 coco_img_dir=os.path.join(coco_root_dir,'Images')
 coco_annotation_dir=os.path.join(coco_root_dir,'Annotations')
 
