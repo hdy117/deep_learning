@@ -14,3 +14,6 @@ dataset/*
 !dataset/coco_dataset.py
 !dataset/coco_subset.py
 ref/*
+__pycache__
+*.pyc
+*.pth
