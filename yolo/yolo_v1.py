@@ -157,6 +157,13 @@ class YOLO_V1_Loss(nn.Module):
         """
         predictions: (batch_size, S, S, num_class + x,y,w,h,confidence) -> YOLOv1 output with 1 bounding box
         target: (batch_size, S, S, num_class + x,y,w,h,confidence) -> Ground truth labels
+        有目标和无目标的损失计算：
+            有目标损失：
+            loss_obj_coord:坐标损失乘以权重 5.0,再乘以 lambda_obj 掩码，只对有目标的网格单元计算损失。
+            loss_obj_confidence:置信度损失乘以 lambda_obj 掩码。
+            loss_obj_class:类别损失乘以 lambda_obj 掩码。
+            无目标损失：
+            loss_noobj_confidence:置信度损失乘以权重 0.5,再乘以 lambda_noobj 掩码，只对无目标的网格单元计算损失。
         """
         # Extract components
         pred_class = predictions[..., :HyperParam.NUM_CLASS]    # Class probabilities
@@ -187,6 +194,17 @@ class YOLO_V1_Loss(nn.Module):
         # total loss
         # loss=5.0*lambda_obj*loss_coord.sum()+lambda_obj*loss_confidence.sum()+\
         #     0.5*lambda_noobj*loss_confidence.sum()+lambda_obj*loss_class.sum()
-        loss=5.0*loss_coord+loss_confidence+loss_class
-        
+        # loss=5.0*loss_coord+loss_confidence+loss_class
+
+        # 有目标的损失
+        loss_obj_coord = 5.0 * lambda_obj * loss_coord
+        loss_obj_confidence = lambda_obj * loss_confidence
+        loss_obj_class = lambda_obj * loss_class
+
+        # 无目标的损失
+        loss_noobj_confidence = 0.5 * lambda_noobj * loss_confidence
+
+        # 总损失
+        loss = loss_obj_coord.sum() + loss_obj_confidence.sum() + loss_obj_class.sum() + loss_noobj_confidence.sum()
+
         return loss
