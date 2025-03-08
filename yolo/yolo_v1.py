@@ -88,6 +88,7 @@ class COCODataset(Dataset):
             if i>=HyperParam.S or j>=HyperParam.S:
                 print(f'anno_info["bbox"]:{anno_info['bbox']}')
                 print(f'i:{i},j:{j},x:{x},y:{y},grid_size:{HyperParam.GRID_SIZE}')
+                continue
             labels[i,j,0:HyperParam.NUM_CLASS]=torch.zeros(HyperParam.NUM_CLASS) # clear class
             labels[i,j,category_id-1]=1.0
 
