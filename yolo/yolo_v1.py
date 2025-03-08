@@ -34,7 +34,7 @@ class HyperParam:
 
 # 1. prepare dataset
 class COCODataset(Dataset):
-    def __init__(self, img_folder, anno_file_path, img_new_size=224, transform=None):
+    def __init__(self, img_folder, anno_file_path, img_new_size=HyperParam.IMG_SIZE, transform=None):
         super().__init__()
         self.transform=transform
         self.img_new_size=img_new_size
@@ -72,6 +72,8 @@ class COCODataset(Dataset):
             i,j=x//HyperParam.GRID_SIZE,y//HyperParam.GRID_SIZE
 
             # num class
+            if i>=HyperParam.S or j>=HyperParam.S:
+                print(f'i:{i},j:{j},x:{x},y:{y},grid_size:{HyperParam.GRID_SIZE}')
             labels[i,j,0:HyperParam.NUM_CLASS]=torch.zeros(HyperParam.NUM_CLASS) # clear class
             labels[i,j,category_id-1]=1.0
 
@@ -84,7 +86,7 @@ class COCODataset(Dataset):
 
             # confidence
             confidence=1.0
-            labels[i,j,HyperParam.NUM_CLASS+HyperParam.OUT_DIM]=confidence
+            labels[i,j,HyperParam.OUT_DIM]=confidence
 
         # convert pil image to torch tensor
         img_data:np.ndarray=np.array(img_pil)
@@ -98,7 +100,7 @@ class COCODataset(Dataset):
 
 # 4.0 model define
 class YOLO_V1(nn.Module):
-    def __init__(self,input_channel=3, img_size=(224,224)):
+    def __init__(self,input_channel=3, img_size=(HyperParam.IMG_SIZE,HyperParam.IMG_SIZE)):
         super().__init__()
         self.output_dim=HyperParam.OUT_DIM
         self.conv_layers=nn.Sequential(
@@ -169,11 +171,11 @@ class YOLO_V1_Loss(nn.Module):
         """
         # Extract components
         pred_class = predictions[..., :HyperParam.NUM_CLASS]    # Class probabilities
-        pred_conf = predictions[..., HyperParam.NUM_CLASS+HyperParam.OUT_DIM]   # Confidence score
+        pred_conf = predictions[..., HyperParam.OUT_DIM]   # Confidence score
         pred_bbox = predictions[..., HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]  # Bounding box [x, y, w, h]
 
         target_class = labels[..., :HyperParam.NUM_CLASS]   # Ground truth class
-        target_conf = labels[..., HyperParam.NUM_CLASS+HyperParam.OUT_DIM]  # Ground truth confidence
+        target_conf = labels[..., HyperParam.OUT_DIM]  # Ground truth confidence
         target_bbox = labels[..., HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE] # Ground truth bounding box
 
         # mse loss function
