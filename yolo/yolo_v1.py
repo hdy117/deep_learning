@@ -26,11 +26,11 @@ class HyperParam:
     # label info
     S=7 # input image will be splitted into SxS anchors
     IMG_SIZE=224 # size of image
-    GRID_SIZE=IMG_SIZE/S # size of grid
-    BBOX_SIZE=4
-    CONFIDENT_SIZE=1 
-    NUM_CLASS=90
-    OUT_DIM=BBOX_SIZE+CONFIDENT_SIZE+NUM_CLASS # output dim
+    GRID_SIZE=IMG_SIZE//S # size of grid
+    BBOX_SIZE=int(4)
+    CONFIDENT_SIZE=int(1) 
+    NUM_CLASS=int(90)
+    OUT_DIM=int(BBOX_SIZE+CONFIDENT_SIZE+NUM_CLASS) # output dim
 
 # 1. prepare dataset
 class COCODataset(Dataset):
@@ -80,7 +80,7 @@ class COCODataset(Dataset):
             y=(y-i*HyperParam.GRID_SIZE)/HyperParam.GRID_SIZE
             w=w/width
             h=h/height
-            labels[i,j,HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.OUT_DIM]=torch.tensor([x,y,w,h])
+            labels[i,j,HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]=torch.tensor([x,y,w,h])
 
             # confidence
             confidence=1.0
@@ -170,11 +170,11 @@ class YOLO_V1_Loss(nn.Module):
         # Extract components
         pred_class = predictions[..., :HyperParam.NUM_CLASS]    # Class probabilities
         pred_conf = predictions[..., HyperParam.NUM_CLASS+HyperParam.OUT_DIM]   # Confidence score
-        pred_bbox = predictions[..., HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.OUT_DIM]  # Bounding box [x, y, w, h]
+        pred_bbox = predictions[..., HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]  # Bounding box [x, y, w, h]
 
         target_class = labels[..., :HyperParam.NUM_CLASS]   # Ground truth class
         target_conf = labels[..., HyperParam.NUM_CLASS+HyperParam.OUT_DIM]  # Ground truth confidence
-        target_bbox = labels[..., HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.OUT_DIM] # Ground truth bounding box
+        target_bbox = labels[..., HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE] # Ground truth bounding box
 
         # mse loss function
         mse=nn.MSELoss()
