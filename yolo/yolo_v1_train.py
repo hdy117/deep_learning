@@ -10,7 +10,7 @@ import math
 from yolo_v1 import *
 
 # train dataloader
-train_dataset=COCODataset(coco_dataset.coco_train_img_dir,coco_dataset.coco_train_annotation_file)
+train_dataset=COCODataset(coco_dataset.coco_train_img_dir,coco_dataset.coco_train_sub_annotation_file)
 train_data_loader=DataLoader(dataset=train_dataset, shuffle=True, batch_size=HyperParam.batch_size)
 
 # train

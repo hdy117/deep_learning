@@ -30,7 +30,8 @@ class HyperParam:
     BBOX_SIZE=int(4)
     CONFIDENT_SIZE=int(1) 
     # NUM_CLASS=int(90)
-    NUM_CLASS=int(3)
+    NUM_CLASS=int(1)
+    TARGET_CLASS_LABELS=[3] # 3 mean car
     OUT_DIM=int(BBOX_SIZE+CONFIDENT_SIZE+NUM_CLASS) # output dim
 
 # 1. prepare dataset
@@ -54,7 +55,6 @@ class COCODataset(Dataset):
         img_id=self.coco_parser.get_img_id(img_info)
 
         # load and resize image
-        img_name=self.coco_parser.get_img_name(img_info=img_info)
         img_pil=self.coco_parser.load_img(self.coco_parser.get_img_name(img_info=img_info))
         width, height=img_pil.size
         img_pil=coco_dataset.ImgLabelResize.image_resize(img_pil,new_size=self.img_new_size)
@@ -74,8 +74,8 @@ class COCODataset(Dataset):
             # get category id
             category_id=anno_info['category_id']
             
-            # only detect category less than or equal to HyperParam.NUM_CLASS
-            if category_id>HyperParam.NUM_CLASS:
+            # only detect category in HyperParam.TARGET_CLASS_LABELS
+            if category_id not in HyperParam.TARGET_CLASS_LABELS:
                 continue
             
             # bounding box

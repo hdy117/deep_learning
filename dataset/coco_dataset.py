@@ -16,10 +16,12 @@ coco_annotation_dir=os.path.join(coco_root_dir,'Annotations')
 # coco annotation of train
 coco_train_img_dir=os.path.join(coco_img_dir,'train2017')
 coco_train_annotation_file=os.path.join(coco_annotation_dir,'annotations_trainval2017','annotations','instances_train2017.json')
+coco_train_sub_annotation_file=os.path.join(coco_annotation_dir,'annotations_trainval2017','annotations','train_subset.json')
 
 # coco annotation of val
 coco_val_img_dir=os.path.join(coco_img_dir,'val2017')
 coco_val_annotation_file=os.path.join(coco_annotation_dir,'annotations_trainval2017','annotations','instances_val2017.json')
+coco_val_sub_annotation_file=os.path.join(coco_annotation_dir,'annotations_trainval2017','annotations','val_subset.json')
 
 class ImgLabelResize:
     def __init__(self):

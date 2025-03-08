@@ -61,12 +61,12 @@ class COCOSubset:
         anno_id = 1
         for img_id in filtered_img_ids:
             ann_ids = coco.getAnnIds(imgIds=img_id, catIds=category_ids)
-        anns = coco.loadAnns(ann_ids)
-        for ann in anns:
-            ann["id"] = anno_id
-            ann["image_id"] = image_id_map[img_id]
-            new_anno["annotations"].append(ann)
-            anno_id += 1
+            anns = coco.loadAnns(ann_ids)
+            for ann in anns:
+                ann["id"] = anno_id
+                ann["image_id"] = image_id_map[img_id]
+                new_anno["annotations"].append(ann)
+                anno_id += 1
 
         # 保存新的标注文件
         with open(self.sub_anno_file, 'w') as f:
