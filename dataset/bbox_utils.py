@@ -16,6 +16,9 @@ class BBOXUtils:
     
     def save_img_with_bbox(self, imgs:torch.Tensor, pred_class:torch.Tensor, 
                            pred_conf:torch.Tensor, pred_bbox:torch.Tensor, grid_size:int=224//7):
+        '''
+        save image with bbox for YOLO v1 only
+        '''
         batch_size=imgs.shape[0] # batch size
 
         for i in range(batch_size):
