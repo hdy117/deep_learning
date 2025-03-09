@@ -17,7 +17,7 @@ from dataset import coco_dataset
 # 0. hyper param
 class HyperParam:
     batch_size=64
-    n_epoch=30
+    n_epoch=50
     learning_rate=0.01
     weight_decay=0.0005
     device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -118,47 +118,57 @@ class YOLO_V1(nn.Module):
     def __init__(self,input_channel=3, img_size=(HyperParam.IMG_SIZE,HyperParam.IMG_SIZE)):
         super().__init__()
         self.output_dim=HyperParam.OUT_DIM
-        self.conv_layers=nn.Sequential(
-            nn.Conv2d(in_channels=input_channel,out_channels=32,kernel_size=7,padding=3),
-            nn.LeakyReLU(0.1),
-            nn.MaxPool2d(kernel_size=2,stride=2),  # (32,112,112)
-
-            nn.Conv2d(in_channels=32,out_channels=64,kernel_size=3,padding=1),
-            nn.LeakyReLU(0.1),
-            nn.MaxPool2d(kernel_size=2,stride=2),  # (64,56,56)
-
-            nn.Conv2d(in_channels=64,out_channels=64,kernel_size=1),
-            nn.LeakyReLU(0.1),
-            nn.Conv2d(in_channels=64,out_channels=128,kernel_size=3,padding=1),
-            nn.LeakyReLU(0.1),
-            nn.Conv2d(in_channels=128,out_channels=128,kernel_size=1),
-            nn.LeakyReLU(0.1),
-            nn.Conv2d(in_channels=128,out_channels=256,kernel_size=3,padding=1),
-            nn.LeakyReLU(0.1),
-            nn.MaxPool2d(kernel_size=2,stride=2),  # (256,28,28)
-
-            nn.Conv2d(in_channels=256,out_channels=128,kernel_size=1),
-            nn.LeakyReLU(0.1),
-            nn.Conv2d(in_channels=128,out_channels=256,kernel_size=3,padding=1),
-            nn.LeakyReLU(0.1),
-            nn.Conv2d(in_channels=256,out_channels=256,kernel_size=1),
-            nn.LeakyReLU(0.1),
-            nn.Conv2d(in_channels=256,out_channels=512,kernel_size=3,padding=1),
-            nn.LeakyReLU(0.1),
-            nn.MaxPool2d(kernel_size=2,stride=2)  # (512,14,14)
-        )
-
-        self.fc=nn.Sequential(
-            nn.Linear(in_features=512*14*14,out_features=2048),
-            nn.LeakyReLU(0.1),
-            nn.Linear(in_features=2048,out_features=2048),
-            nn.Tanh(),
-            nn.Linear(in_features=2048,out_features=7*7*self.output_dim)
+        # 第一层卷积
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=7, stride=1, padding=3),
+            nn.BatchNorm2d(64),
+            nn.LeakyReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2)
+        ) # (64,112,112)
+        # 第二层卷积
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(64, 192, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(192),
+            nn.LeakyReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2)
+        ) # (192,56,56)
+        # 第三层卷积
+        self.conv3 = nn.Sequential(
+            nn.Conv2d(192, 128, kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(128),
+            nn.LeakyReLU(),
+            nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(64),
+            nn.LeakyReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2)
+        ) # (64,28,28)
+        # 第四层卷积
+        self.conv4 = nn.Sequential(
+            nn.Conv2d(64, 32, kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(32),
+            nn.LeakyReLU(),
+            nn.Conv2d(32, 16, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(16),
+            nn.LeakyReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2)
+        ) # (16,14,14)
+        # 全连接层
+        self.fc = nn.Sequential(
+            nn.Linear(16 * 14 * 14, 1024),
+            nn.LeakyReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(1024, 512),
+            nn.LeakyReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(512, HyperParam.S*HyperParam.S*HyperParam.OUT_DIM)
         )
 
     def forward(self,img):
-        out=self.conv_layers(img)
-        out=out.view(-1,512*14*14)
+        out=self.conv1(img)
+        out=self.conv2(out)
+        out=self.conv3(out)
+        out=self.conv4(out)
+        out=out.view(-1,16*14*14)
         out=self.fc(out)
         out=out.view(-1,HyperParam.S,HyperParam.S,HyperParam.OUT_DIM)
         return out
@@ -192,8 +202,8 @@ class YOLO_V1_Loss(nn.Module):
         mse=nn.MSELoss(reduction='none')
 
         # if has obj or not
-        lambda_obj=target_conf>=0.5
-        lambda_noobj=target_conf<0.5
+        lambda_obj=target_conf>0.9
+        lambda_noobj=target_conf<0.1
 
         # coordinate loss
         loss_coord=mse(pred_bbox[...,:2],target_bbox[...,:2]).mean(-1)+mse(
