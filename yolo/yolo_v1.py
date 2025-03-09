@@ -173,8 +173,8 @@ class YOLO_V1(nn.Module):
         out=out.view(-1,HyperParam.S,HyperParam.S,HyperParam.OUT_DIM)
 
         pred_class=out[...,:HyperParam.NUM_CLASS]
-        pred_coord=out[...,HyperParam.NUM_CLASS:HyperParam.BBOX_SIZE]
-        pred_conf=out[...,HyperParam.BBOX_SIZE]
+        pred_coord=out[...,HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]
+        pred_conf=out[...,HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]
 
         confidence_sigmoid=nn.Sigmoid()
         pred_conf=confidence_sigmoid(pred_conf)
