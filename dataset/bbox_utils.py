@@ -36,16 +36,16 @@ class BBOXUtils:
             draw = ImageDraw.Draw(img_pil)
             
             # get and draw bbox
-            for r in range(pred_bbox.shape[1]):
-                for c in range(pred_bbox.shape[2]):
-                    if pred_conf[i,r,c]>conf_thresh:
+            for grid_i in range(pred_bbox.shape[1]):
+                for grid_j in range(pred_bbox.shape[2]):
+                    if pred_conf[i,grid_i,grid_j]>conf_thresh:
                         # extract bbox if condidence is greater than conf_thresh
-                        [x,y,w,h]=pred_bbox[i, r, c].tolist()
+                        [x,y,w,h]=pred_bbox[i, grid_i, grid_j].tolist()
                         print(f'{x},{y},{w},{h}')
 
                         # de-normalize bbox
-                        x=r*grid_size+x*grid_size
-                        y=c*grid_size+y*grid_size
+                        x=grid_i*grid_size+x*grid_size
+                        y=grid_j*grid_size+y*grid_size
                         w=width*abs(w)
                         h=height*abs(h)
                         x_top_left=int(x-abs(w)/2)
