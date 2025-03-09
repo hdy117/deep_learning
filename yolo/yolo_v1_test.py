@@ -49,12 +49,12 @@ def test():
             # loss
             batch_size=samples.shape[0]
             n_total+=batch_size*HyperParam.S*HyperParam.S
-            label_class=labels[...,:HyperParam.NUM_CLASS]
+            label_conf=labels[...,HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]
             # print(f'{pred_class.shape},{label_class.shape}')
 
             # for only one class
-            pred_obj=pred_class>conf_thresh
-            label_obj=label_class>conf_thresh
+            pred_obj=pred_conf>conf_thresh
+            label_obj=label_conf>conf_thresh
             n_correct+=(pred_obj==label_obj).sum().item()
 
             # for multiple class
