@@ -152,12 +152,12 @@ class YOLO_V1(nn.Module):
         ) # (256,14,14)
         # 全连接层
         self.fc = nn.Sequential(
-            nn.Linear(256*14*14, 1024),
-            nn.BatchNorm1d(1024),
+            nn.Linear(256*14*14, 4096),
+            nn.BatchNorm1d(4096),
             nn.LeakyReLU(),
-            nn.Linear(1024, 512),
+            nn.Linear(4096, 4096),
             nn.Tanh(),
-            nn.Linear(512, HyperParam.S*HyperParam.S*HyperParam.OUT_DIM)
+            nn.Linear(4096, HyperParam.S*HyperParam.S*HyperParam.OUT_DIM)
         )
 
     def forward(self,img):
