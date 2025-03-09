@@ -13,7 +13,8 @@ onnx/*
 dataset/*
 !dataset/coco_dataset.py
 !dataset/coco_subset.py
-ref/*
+!dataset/coco_subset.py
+ref/*bbox_utils.py
 __pycache__
 *.pyc
 *.pth

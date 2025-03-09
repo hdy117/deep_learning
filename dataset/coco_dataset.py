@@ -176,7 +176,7 @@ class COCOParser:
 
         # get image info
         img_infos=self.get_img_infos()
-        img_info=img_infos[13]
+        img_info=img_infos[20]
         print(f'img_name:{self.get_img_name(img_info)}, img_id:{self.get_img_id(img_info)}')
 
         # load image
