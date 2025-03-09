@@ -79,26 +79,27 @@ class COCODataset(Dataset):
             x,y,w,h=anno_info['bbox'][0],anno_info['bbox'][1],anno_info['bbox'][2],anno_info['bbox'][3]
             
             # grid coordinate
-            i,j=int(x//HyperParam.GRID_SIZE),int(y//HyperParam.GRID_SIZE)
+            grid_i,grid_j=int(x//HyperParam.GRID_SIZE),int(y//HyperParam.GRID_SIZE)
 
             # num class
-            if i>=HyperParam.S or j>=HyperParam.S:
+            if grid_i>=HyperParam.S or grid_j>=HyperParam.S:
                 print(f'anno_info["bbox"]:{anno_info['bbox']}')
-                print(f'i:{i},j:{j},x:{x},y:{y},grid_size:{HyperParam.GRID_SIZE}')
+                print(f'grid_i:{grid_i},grid_j:{grid_j},x:{x},y:{y},grid_size:{HyperParam.GRID_SIZE}')
                 continue
-            labels[i,j,0:HyperParam.NUM_CLASS]=torch.zeros(HyperParam.NUM_CLASS) # clear class
-            labels[i,j,0]=1.0 # since there is only 1 class
+            labels[grid_i,grid_j,0:HyperParam.NUM_CLASS]=torch.zeros(HyperParam.NUM_CLASS) # clear class
+            labels[grid_i,grid_j,0]=1.0 # since there is only 1 class
 
             # normalize x,y,w,h
-            x=(x-i*HyperParam.GRID_SIZE)/HyperParam.GRID_SIZE
-            y=(y-j*HyperParam.GRID_SIZE)/HyperParam.GRID_SIZE
+            x=(x-grid_i*HyperParam.GRID_SIZE)/HyperParam.GRID_SIZE
+            y=(y-grid_j*HyperParam.GRID_SIZE)/HyperParam.GRID_SIZE
             w=w/width
             h=h/height
-            labels[i,j,HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]=torch.tensor([x,y,w,h])
+            labels[grid_i,grid_j,HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]=torch.tensor([x,y,w,h])
+            print(f'x,y,w,h{x,y,w,h}')
 
             # confidence
             confidence=1.0
-            labels[i,j,HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]=confidence
+            labels[grid_i,grid_j,HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]=confidence
 
         # convert pil image to torch tensor
         img_data:np.ndarray=np.array(img_pil)
