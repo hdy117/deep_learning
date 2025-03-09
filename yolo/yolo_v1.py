@@ -90,7 +90,7 @@ class COCODataset(Dataset):
                 print(f'i:{i},j:{j},x:{x},y:{y},grid_size:{HyperParam.GRID_SIZE}')
                 continue
             labels[i,j,0:HyperParam.NUM_CLASS]=torch.zeros(HyperParam.NUM_CLASS) # clear class
-            labels[i,j,category_id-1]=1.0
+            labels[i,j,0]=1.0 # since there is only 1 class
 
             # normalize x,y,w,h
             x=(x-i*HyperParam.GRID_SIZE)/HyperParam.GRID_SIZE
