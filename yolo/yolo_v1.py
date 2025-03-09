@@ -209,8 +209,8 @@ class YOLO_V1_Loss(nn.Module):
         mse=nn.MSELoss(reduction='none')
 
         # if has obj or not for all grids
-        lambda_obj=(target_conf>0.9).float()
-        lambda_noobj=(target_conf<0.1).float()
+        lambda_obj=(target_conf>=0.6).float()
+        lambda_noobj=(target_conf<0.6).float()
 
         # coordinate loss
         # print(f'pred_bbox.shape:{pred_bbox.shape}, target_bbox.shape:{target_bbox.shape}')
