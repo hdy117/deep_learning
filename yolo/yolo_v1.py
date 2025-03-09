@@ -151,11 +151,13 @@ class YOLO_V1(nn.Module):
         ) # (256,14,14)
         # 全连接层
         self.fc = nn.Sequential(
-            nn.Linear(256 * 14 * 14, 1024),
+            nn.Linear(256*14*14, 1024),
+            nn.BatchNorm1d(1024),
             nn.LeakyReLU(),
             nn.Dropout(0.2),
             nn.Linear(1024, 512),
-            nn.LeakyReLU(),
+            nn.BatchNorm1d(512),
+            nn.Tanh(),
             nn.Dropout(0.2),
             nn.Linear(512, HyperParam.S*HyperParam.S*HyperParam.OUT_DIM)
         )
