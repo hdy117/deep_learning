@@ -91,7 +91,7 @@ class COCODataset(Dataset):
 
             # normalize x,y,w,h
             x=(x-i*HyperParam.GRID_SIZE)/HyperParam.GRID_SIZE
-            y=(y-i*HyperParam.GRID_SIZE)/HyperParam.GRID_SIZE
+            y=(y-j*HyperParam.GRID_SIZE)/HyperParam.GRID_SIZE
             w=w/width
             h=h/height
             labels[i,j,HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]=torch.tensor([x,y,w,h])
@@ -216,16 +216,16 @@ class YOLO_V1_Loss(nn.Module):
 
         # coordinate loss
         # print(f'pred_bbox.shape:{pred_bbox.shape}, target_bbox.shape:{target_bbox.shape}')
-        loss_coord=mse(pred_bbox[...,:2],target_bbox[...,:2]).mean(-1)+mse(
+        loss_coord=mse(pred_bbox[...,:2],target_bbox[...,:2]).sum(-1)+mse(
             torch.sqrt(torch.abs(pred_bbox[..., 2:4]) + 1e-8),
-            torch.sqrt(torch.abs(target_bbox[..., 2:4]) + 1e-8)).mean(-1)
+            torch.sqrt(torch.abs(target_bbox[..., 2:4]) + 1e-8)).sum(-1)
         # print(f'pred_conf.shape:{pred_conf.shape}, target_conf.shape:{target_conf.shape}')
         loss_confidence=mse(pred_conf,target_conf)
         # print(f'lambda_obj.shape:{lambda_obj.shape}, loss_coord.shape:{loss_coord.shape}, loss_confidence.shape:{loss_confidence.shape}')
 
         # class loss
         # print(f'pred_class.shape:{pred_class.shape}, target_class.shape:{target_class.shape}')
-        loss_class=mse(pred_class,target_class).mean(-1)
+        loss_class=mse(pred_class,target_class).sum(-1)
 
         # 有目标的损失
         loss_obj_coord = 5.0 * lambda_obj * loss_coord
