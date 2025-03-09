@@ -37,8 +37,8 @@ class BBOXUtils:
             # get and draw bbox
             for r in range(pred_bbox.shape[1]):
                 for c in range(pred_bbox.shape[2]):
-                    if pred_conf[i,r,c]>0.9:
-                        # extract bbox if condidence is greater than 0.9
+                    if pred_conf[i,r,c]>0.6:
+                        # extract bbox if condidence is greater than 0.6
                         [x,y,w,h]=pred_bbox[i, r, c].tolist()
                         print(f'{x},{y},{w},{h}')
 
@@ -47,10 +47,10 @@ class BBOXUtils:
                         y=c*grid_size+y*grid_size
                         w=width*abs(w)
                         h=height*abs(h)
-                        x_top_left=int(x-w/2)
-                        y_top_left=int(y-h/2)
-                        x_down_right=int(x+w/2)
-                        y_down_right=int(y+h/2)
+                        x_top_left=int(x-abs(w)/2)
+                        y_top_left=int(y-abs(h)/2)
+                        x_down_right=int(x+abs(w)/2)
+                        y_down_right=int(y+abs(h)/2)
                         print(f'{x_top_left},{y_top_left},{x_down_right},{y_down_right}')
 
                         # draw bbox
