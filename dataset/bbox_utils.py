@@ -46,12 +46,14 @@ class BBOXUtils:
                         # de-normalize bbox
                         x=grid_i*grid_size+x*grid_size
                         y=grid_j*grid_size+y*grid_size
-                        w=width*abs(w)
-                        h=height*abs(h)
-                        x_top_left=int(x-abs(w)/2)
-                        y_top_left=int(y-abs(h)/2)
-                        x_down_right=int(x+abs(w)/2)
-                        y_down_right=int(y+abs(h)/2)
+                        if w<=0.0 or h<=0.0:
+                            continue
+                        w=width*w
+                        h=height*h
+                        x_top_left=int(x-w/2)
+                        y_top_left=int(y-h/2)
+                        x_down_right=int(x+w/2)
+                        y_down_right=int(y+h/2)
                         print(f'{x_top_left},{y_top_left},{x_down_right},{y_down_right}')
 
                         # draw bbox
