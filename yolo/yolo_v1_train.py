@@ -12,8 +12,8 @@ train_data_loader=DataLoader(dataset=train_dataset, shuffle=True, batch_size=Hyp
 yolo_v1=YOLO_V1()
 yolo_v1=yolo_v1.to(HyperParam.device)
 
-optimizer=torch.optim.Adam(yolo_v1.parameters(),)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+optimizer=torch.optim.Adam(yolo_v1.parameters(),lr=HyperParam.learning_rate)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
 criterion=YOLO_V1_Loss()
 
 def train():

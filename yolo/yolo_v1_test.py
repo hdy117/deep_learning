@@ -51,8 +51,8 @@ def test():
             # print(f'{pred_class.shape},{label_class.shape}')
 
             # for only one class
-            pred_obj=pred_class>0.9
-            label_obj=label_class>0.9
+            pred_obj=pred_class>0.6
+            label_obj=label_class>0.6
             n_correct+=(pred_obj==label_obj).sum().item()
 
             # for multiple class
