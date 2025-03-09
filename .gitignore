@@ -19,3 +19,4 @@ ref/*
 __pycache__
 *.pyc
 *.pth
+test
