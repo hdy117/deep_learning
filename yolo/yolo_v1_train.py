@@ -35,10 +35,10 @@ def train():
             optimizer.zero_grad()
 
             # predict
-            y_pred=yolo_v1.forward(samples)
+            pred_class, pred_coord, pre_confidence=yolo_v1.forward(samples)
 
             # loss
-            loss=criterion(y_pred, labels)
+            loss=criterion(pred_class, pred_coord, pre_confidence, labels)
 
             # gradient descent
             loss.backward()

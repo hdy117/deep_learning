@@ -32,7 +32,7 @@ class HyperParam:
     # NUM_CLASS=int(90)
     NUM_CLASS=int(1)
     TARGET_CLASS_LABELS=[3] # 3 mean car
-    OUT_DIM=int(NUM_CLASS+BBOX_SIZE+CONFIDENT_SIZE) # output dim
+    OUT_DIM=int(NUM_CLASS+BBOX_SIZE+CONFIDENT_SIZE) # output dim, NUM_CLASS+BBOX_SIZE+CONFIDENT_SIZE
 
 # 1. prepare dataset
 class COCODataset(Dataset):
@@ -171,13 +171,23 @@ class YOLO_V1(nn.Module):
         out=out.view(-1,16*14*14)
         out=self.fc(out)
         out=out.view(-1,HyperParam.S,HyperParam.S,HyperParam.OUT_DIM)
-        return out
+
+        pred_class=out[...,:HyperParam.NUM_CLASS]
+        pred_coord=out[...,HyperParam.NUM_CLASS:HyperParam.BBOX_SIZE]
+        pred_conf=out[...,HyperParam.BBOX_SIZE]
+
+        confidence_sigmoid=nn.Sigmoid()
+        pred_conf=confidence_sigmoid(pred_conf)
+        class_sigmoid=nn.Sigmoid()
+        pred_class=class_sigmoid(pred_class)
+
+        return pred_class, pred_coord, pred_conf
 
 class YOLO_V1_Loss(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
     
-    def forward(self,predictions:torch.Tensor,labels:torch.Tensor):
+    def forward(self,pred_class:torch.Tensor, pred_bbox:torch.Tensor, pred_conf:torch.Tensor,labels:torch.Tensor):
         """
         predictions: (batch_size, S, S, num_class + x,y,w,h,confidence) -> YOLOv1 output with 1 bounding box
         target: (batch_size, S, S, num_class + x,y,w,h,confidence) -> Ground truth labels
@@ -190,9 +200,9 @@ class YOLO_V1_Loss(nn.Module):
             loss_noobj_confidence:置信度损失乘以权重 0.5,再乘以 lambda_noobj 掩码，只对无目标的网格单元计算损失。
         """
         # Extract components
-        pred_class = predictions[..., :HyperParam.NUM_CLASS]    # Class probabilities
-        pred_conf = predictions[..., HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]   # Confidence score
-        pred_bbox = predictions[..., HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]  # Bounding box [x, y, w, h]
+        # pred_class = predictions[..., :HyperParam.NUM_CLASS]    # Class probabilities
+        # pred_conf = predictions[..., HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]   # Confidence score
+        # pred_bbox = predictions[..., HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]  # Bounding box [x, y, w, h]
 
         target_class = labels[..., :HyperParam.NUM_CLASS]   # Ground truth class
         target_conf = labels[..., HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]  # Ground truth confidence
@@ -206,13 +216,16 @@ class YOLO_V1_Loss(nn.Module):
         lambda_noobj=target_conf<0.1
 
         # coordinate loss
+        # print(f'pred_bbox.shape:{pred_bbox.shape}, target_bbox.shape:{target_bbox.shape}')
         loss_coord=mse(pred_bbox[...,:2],target_bbox[...,:2]).mean(-1)+mse(
             torch.sqrt(torch.abs(pred_bbox[..., 2:4]) + 1e-8),
             torch.sqrt(torch.abs(target_bbox[..., 2:4]) + 1e-8)).mean(-1)
+        # print(f'pred_conf.shape:{pred_conf.shape}, target_conf.shape:{target_conf.shape}')
         loss_confidence=mse(pred_conf,target_conf)
         # print(f'lambda_obj.shape:{lambda_obj.shape}, loss_coord.shape:{loss_coord.shape}, loss_confidence.shape:{loss_confidence.shape}')
 
         # class loss
+        # print(f'pred_class.shape:{pred_class.shape}, target_class.shape:{target_class.shape}')
         loss_class=mse(pred_class,target_class).mean(-1)
 
         # 有目标的损失
