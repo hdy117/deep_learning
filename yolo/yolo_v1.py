@@ -95,7 +95,7 @@ class COCODataset(Dataset):
             w=w/width
             h=h/height
             labels[grid_i,grid_j,HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]=torch.tensor([x,y,w,h])
-            print(f'x,y,w,h{x,y,w,h}')
+            # print(f'x,y,w,h{x,y,w,h}')
 
             # confidence
             confidence=1.0
@@ -155,11 +155,8 @@ class YOLO_V1(nn.Module):
             nn.Linear(256*14*14, 1024),
             nn.BatchNorm1d(1024),
             nn.LeakyReLU(),
-            nn.Dropout(0.2),
             nn.Linear(1024, 512),
-            nn.BatchNorm1d(512),
             nn.Tanh(),
-            nn.Dropout(0.2),
             nn.Linear(512, HyperParam.S*HyperParam.S*HyperParam.OUT_DIM)
         )
 
