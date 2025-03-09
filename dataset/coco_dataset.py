@@ -152,7 +152,7 @@ class COCOParser:
         '''
         return PIL Image with shape (width, height, channel)
         '''
-        img=Image.open(os.path.join(self.img_dir, img_file_name))
+        img=Image.open(os.path.join(self.img_dir, img_file_name)).convert("RGB")
         return img
 
     def get_annotation_infos_by_img_id(self, img_id)->list[dict]:

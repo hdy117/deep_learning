@@ -57,14 +57,11 @@ class COCODataset(Dataset):
         # load and resize image
         img_pil=self.coco_parser.load_img(self.coco_parser.get_img_name(img_info=img_info))
         width, height=img_pil.size
-        img_pil=coco_dataset.ImgLabelResize.image_resize(img_pil,new_size=self.img_new_size)
+        img_pil=coco_dataset.ImgLabelResize.image_resize(img=img_pil,new_size=self.img_new_size)
 
         # load and resize labels
         anno_infos=self.coco_parser.get_annotation_infos_by_img_id(img_id)
         labels=torch.zeros(HyperParam.S,HyperParam.S,HyperParam.OUT_DIM)
-        for i in range(HyperParam.S):
-            for j in range(HyperParam.S):
-                labels[i,j]=torch.zeros(HyperParam.OUT_DIM)
 
         for anno_info in anno_infos:
             # label, [num_class,x,y,w,h,confidence]
@@ -105,7 +102,7 @@ class COCODataset(Dataset):
 
         # convert pil image to torch tensor
         img_data:np.ndarray=np.array(img_pil)
-        img_data:torch.Tensor=torch.from_numpy(img_data)
+        img_data:torch.Tensor=torch.from_numpy(img_data).float()
         img_data=img_data.permute(2,0,1) # channel, width, height
         img_data=img_data/255.0 # normalize
 

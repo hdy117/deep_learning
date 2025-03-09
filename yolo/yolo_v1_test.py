@@ -1,10 +1,13 @@
 import torch
-import os
+import os, sys
 import numpy as np
 
 from yolo_v1 import *
 
 g_file_path=os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(g_file_path,"..","dataset"))
+
+import bbox_utils
 
 # test dataloader
 val_dataset=COCODataset(coco_dataset.coco_val_img_dir,coco_dataset.coco_val_sub_annotation_file)
@@ -13,6 +16,9 @@ val_data_loader=DataLoader(dataset=val_dataset, shuffle=True, batch_size=HyperPa
 # test
 yolo_v1=YOLO_V1()
 yolo_v1=yolo_v1.to(HyperParam.device)
+
+# draw and save bbox image
+bbox_utils=bbox_utils.BBOXUtils(out_folder=os.path.join(g_file_path,"test"))
 
 def test():
     # load saved model
@@ -35,16 +41,24 @@ def test():
             labels=labels.to(HyperParam.device)
 
             # predict
-            y_pred=yolo_v1.forward(samples)
+            pred_class, pred_coord, pred_conf=yolo_v1.forward(samples)
+            bbox_utils.save_img_with_bbox(samples, pred_class, pred_conf, pred_coord, HyperParam.GRID_SIZE)
 
             # loss
-            pred_class=y_pred[...,HyperParam.NUM_CLASS]
-            label_class=labels[...,HyperParam.NUM_CLASS]
-            _,pred_idx=torch.max(pred_class,dim=1)
-            _,label_idx=torch.max(label_class,dim=1)
+            batch_size=samples.shape[0]
+            n_total+=batch_size*HyperParam.S*HyperParam.S
+            label_class=labels[...,:HyperParam.NUM_CLASS]
+            # print(f'{pred_class.shape},{label_class.shape}')
 
-            n_total+=samples.shape[0]
-            n_correct+=(pred_idx==label_idx).sum().item()
+            # for only one class
+            pred_obj=pred_class>0.9
+            label_obj=label_class>0.9
+            n_correct+=(pred_obj==label_obj).sum().item()
+
+            # for multiple class
+            # _,pred_idx=torch.max(pred_class,dim=1)
+            # _,label_idx=torch.max(label_class,dim=1)
+            # n_correct+=(pred_idx==label_idx).sum().item()
             print(f'batch idx:{batch_idx},accuracy:{n_correct/n_total}, n_correct:{n_correct}, n_total:{n_total}')
 
 # main
