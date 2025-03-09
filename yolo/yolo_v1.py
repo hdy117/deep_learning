@@ -151,7 +151,7 @@ class YOLO_V1(nn.Module):
         ) # (256,14,14)
         # 全连接层
         self.fc = nn.Sequential(
-            nn.Linear(16 * 14 * 14, 1024),
+            nn.Linear(256 * 14 * 14, 1024),
             nn.LeakyReLU(),
             nn.Dropout(0.2),
             nn.Linear(1024, 512),
@@ -165,7 +165,7 @@ class YOLO_V1(nn.Module):
         out=self.conv2(out)
         out=self.conv3(out)
         out=self.conv4(out)
-        out=out.view(-1,16*14*14)
+        out=out.view(-1,256*14*14)
         out=self.fc(out)
         out=out.view(-1,HyperParam.S,HyperParam.S,HyperParam.OUT_DIM)
 
