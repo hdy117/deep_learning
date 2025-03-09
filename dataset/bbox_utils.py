@@ -15,7 +15,8 @@ class BBOXUtils:
         os.makedirs(out_folder, exist_ok=True)
     
     def save_img_with_bbox(self, imgs:torch.Tensor, pred_class:torch.Tensor, 
-                           pred_conf:torch.Tensor, pred_bbox:torch.Tensor, grid_size:int=224//7):
+                           pred_conf:torch.Tensor, pred_bbox:torch.Tensor, 
+                           grid_size:int=224//7, conf_thresh=0.6):
         '''
         save image with bbox for YOLO v1 only
         '''
@@ -37,8 +38,8 @@ class BBOXUtils:
             # get and draw bbox
             for r in range(pred_bbox.shape[1]):
                 for c in range(pred_bbox.shape[2]):
-                    if pred_conf[i,r,c]>0.6:
-                        # extract bbox if condidence is greater than 0.6
+                    if pred_conf[i,r,c]>conf_thresh:
+                        # extract bbox if condidence is greater than conf_thresh
                         [x,y,w,h]=pred_bbox[i, r, c].tolist()
                         print(f'{x},{y},{w},{h}')
 

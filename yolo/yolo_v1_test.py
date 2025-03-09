@@ -35,6 +35,7 @@ def test():
         print('================test==================')
         n_total=0
         n_correct=0
+        conf_thresh=0.6
         for batch_idx,(samples, labels) in enumerate(val_data_loader):
             # data to device
             samples=samples.to(HyperParam.device)
@@ -42,7 +43,8 @@ def test():
 
             # predict
             pred_class, pred_coord, pred_conf=yolo_v1.forward(samples)
-            bbox_utils.save_img_with_bbox(samples, pred_class, pred_conf, pred_coord, HyperParam.GRID_SIZE)
+            bbox_utils.save_img_with_bbox(samples, pred_class, pred_conf, 
+                                          pred_coord, HyperParam.GRID_SIZE, conf_thresh)
 
             # loss
             batch_size=samples.shape[0]
@@ -51,8 +53,8 @@ def test():
             # print(f'{pred_class.shape},{label_class.shape}')
 
             # for only one class
-            pred_obj=pred_class>0.6
-            label_obj=label_class>0.6
+            pred_obj=pred_class>conf_thresh
+            label_obj=label_class>conf_thresh
             n_correct+=(pred_obj==label_obj).sum().item()
 
             # for multiple class

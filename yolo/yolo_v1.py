@@ -18,8 +18,8 @@ from dataset import coco_dataset
 class HyperParam:
     batch_size=64
     n_epoch=30
-    learning_rate=0.01
-    weight_decay=0.0005
+    learning_rate=0.001
+    weight_decay=0.0001
     device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model_path=os.path.join(g_file_path,"yolo_v1.pth") # model path
 
