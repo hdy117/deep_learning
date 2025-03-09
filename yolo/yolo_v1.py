@@ -134,29 +134,29 @@ class YOLO_V1(nn.Module):
             nn.Conv2d(192, 128, kernel_size=1, stride=1, padding=0),
             nn.BatchNorm2d(128),
             nn.LeakyReLU(),
-            nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(64),
+            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(256),
             nn.LeakyReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2)
-        ) # (64,28,28)
+        ) # (256,28,28)
         # 第四层卷积
         self.conv4 = nn.Sequential(
-            nn.Conv2d(64, 32, kernel_size=1, stride=1, padding=0),
-            nn.BatchNorm2d(32),
+            nn.Conv2d(256, 128, kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(128),
             nn.LeakyReLU(),
-            nn.Conv2d(32, 16, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(16),
+            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(256),
             nn.LeakyReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2)
-        ) # (16,14,14)
+        ) # (256,14,14)
         # 全连接层
         self.fc = nn.Sequential(
             nn.Linear(16 * 14 * 14, 1024),
             nn.LeakyReLU(),
-            nn.Dropout(0.5),
+            nn.Dropout(0.2),
             nn.Linear(1024, 512),
             nn.LeakyReLU(),
-            nn.Dropout(0.5),
+            nn.Dropout(0.2),
             nn.Linear(512, HyperParam.S*HyperParam.S*HyperParam.OUT_DIM)
         )
 
