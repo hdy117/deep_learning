@@ -2,7 +2,6 @@ from torch.utils.data import Dataset, DataLoader
 from pycocotools.coco import COCO
 import matplotlib.pyplot as plt
 import os
-import cv2
 from PIL import Image
 import numpy as np
 

@@ -56,8 +56,9 @@ class COCODataset(Dataset):
 
         # load and resize image
         img_pil=self.coco_parser.load_img(self.coco_parser.get_img_name(img_info=img_info))
-        width, height=img_pil.size
+        origin_width, origin_height=img_pil.size
         img_pil=coco_dataset.ImgLabelResize.image_resize(img=img_pil,new_size=self.img_new_size)
+        new_width, new_height=img_pil.size
 
         # load and resize labels
         anno_infos=self.coco_parser.get_annotation_infos_by_img_id(img_id)
@@ -66,7 +67,7 @@ class COCODataset(Dataset):
         for anno_info in anno_infos:
             # label, [num_class,x,y,w,h,confidence]
             # get annotation
-            anno_info['bbox']=coco_dataset.ImgLabelResize.label_resize(width,height,anno_info['bbox'],self.img_new_size)
+            anno_info['bbox']=coco_dataset.ImgLabelResize.label_resize(origin_width,origin_height,anno_info['bbox'],self.img_new_size)
             
             # get category id
             category_id=anno_info['category_id']
@@ -92,8 +93,8 @@ class COCODataset(Dataset):
             # normalize x,y,w,h
             x=(x-grid_i*HyperParam.GRID_SIZE)/HyperParam.GRID_SIZE
             y=(y-grid_j*HyperParam.GRID_SIZE)/HyperParam.GRID_SIZE
-            w=w/width
-            h=h/height
+            w=w/new_width
+            h=h/new_height
             labels[grid_i,grid_j,HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]=torch.tensor([x,y,w,h])
             # print(f'x,y,w,h{x,y,w,h}')
 
