@@ -1,5 +1,5 @@
 from PIL import Image, ImageDraw
-import os
+import os,math
 import shutil
 import torch
 import coco_dataset
@@ -17,7 +17,7 @@ class BBOXUtils:
 
     def save_one_img_with_bbox(self,img:Image, bboxs:list[list[int]],img_idx:int=0):
         '''
-        draw resized image and labels
+        draw resized image and labels, bbox:[top_left_x, top_left_y,w,h]
         '''
         img_pil:Image = img
         # print(f"img center pixel:{np.array(img_pil)[112,112]}")
@@ -70,21 +70,27 @@ class BBOXUtils:
         for grid_i in range(pred_bbox.shape[0]):
             for grid_j in range(pred_bbox.shape[1]):
                 if pred_conf[grid_i,grid_j]>conf_thresh:
+                    print(f'******************************')
                     # extract bbox if condidence is greater than conf_thresh
                     [x,y,w,h]=pred_bbox[grid_i, grid_j].tolist()
+                    
+                    # check
+                    if w<=0.0 or h<=0.0 or x<0.0 or y<0.0:
+                        continue
 
                     # de-normalize bbox
-                    x=grid_i*grid_size+x*grid_size
-                    y=grid_j*grid_size+y*grid_size
-                    if w<=0.0 or h<=0.0:
+                    x=math.ceil(grid_i*grid_size+x*grid_size)
+                    y=math.ceil(grid_j*grid_size+y*grid_size)
+                    w=math.ceil(width*w)
+                    h=math.ceil(height*h)
+                    
+                    x_top_left=max(0,int(x-w/2))
+                    y_top_left=max(0,int(y-h/2))
+                    x_down_right=min(width,int(x+w/2))
+                    y_down_right=min(height,int(y+h/2))
+                    if x_top_left>x_down_right or y_top_left>y_down_right:
                         continue
-                    print(f'{x},{y},{w},{h}')
-                    w=width*w
-                    h=height*h
-                    x_top_left=int(x-w/2)
-                    y_top_left=int(y-h/2)
-                    x_down_right=int(x+w/2)
-                    y_down_right=int(y+h/2)
+                    print(f'x:{x},y:{y},w:{w},h:{h}')
                     print(f'{x_top_left},{y_top_left},{x_down_right},{y_down_right}')
 
                     # draw bbox
@@ -107,42 +113,11 @@ class BBOXUtils:
             # convert img tensor to pil image
             img_tensor:torch.Tensor=imgs[i].cpu() # img tensor
             img_tensor=img_tensor.permute(1,2,0)
-            img_tensor = (img_tensor*255).clip(0,255).byte()
-            img_pil:Image = Image.fromarray(img_tensor.numpy(),mode="RGB")
-            # print(f"img center pixel:{np.array(img_pil)[112,112]}")
+            img_tensor=(img_tensor*255).clip(0,255).byte()
 
-            width,height=img_pil.size
-            draw = ImageDraw.Draw(img_pil)
-            
-            # get and draw bbox
-            for grid_i in range(pred_bbox.shape[1]):
-                for grid_j in range(pred_bbox.shape[2]):
-                    if pred_conf[i,grid_i,grid_j]>conf_thresh:
-                        # extract bbox if condidence is greater than conf_thresh
-                        [x,y,w,h]=pred_bbox[i, grid_i, grid_j].tolist()
-
-                        # de-normalize bbox
-                        x=grid_i*grid_size+x*grid_size
-                        y=grid_j*grid_size+y*grid_size
-                        if w<=0.0 or h<=0.0:
-                            continue
-                        print(f'{x},{y},{w},{h}')
-                        w=width*w
-                        h=height*h
-                        x_top_left=int(x-w/2)
-                        y_top_left=int(y-h/2)
-                        x_down_right=int(x+w/2)
-                        y_down_right=int(y+h/2)
-                        print(f'{x_top_left},{y_top_left},{x_down_right},{y_down_right}')
-
-                        # draw bbox
-                        draw.rectangle([(x_top_left,y_top_left),(x_down_right,y_down_right)], outline="red", width=2)  # outline颜色，width线宽
-            
-            # save image
-            out_img_path=os.path.join(self.out_folder, f'{self.img_prefix}{self.img_idx}.jpg')
-            img_pil.save(out_img_path)
+            self.save_one_norm_img_with_bbox(img_tensor, pred_class[i],pred_conf[i],pred_bbox[i],
+                                             grid_size,conf_thresh,self.img_idx)
             self.img_idx+=1
-
         
 if __name__=="__main__":
     coco_parser=coco_dataset.COCOParser(img_dir=coco_dataset.coco_val_img_dir, annotation_file=coco_dataset.coco_val_sub_annotation_file)

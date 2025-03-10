@@ -16,7 +16,7 @@ from dataset import coco_dataset
 
 # 0. hyper param
 class HyperParam:
-    batch_size=128
+    batch_size=64
     n_epoch=30
     learning_rate=0.001
     weight_decay=0.0001
@@ -216,11 +216,11 @@ class YOLO_V1_Loss(nn.Module):
 
         # coordinate loss
         # print(f'pred_bbox.shape:{pred_bbox.shape}, target_bbox.shape:{target_bbox.shape}')
-        # loss_coord=mse(pred_bbox[...,:2],target_bbox[...,:2]).sum(-1)+mse(
-        #     torch.sqrt(torch.abs(pred_bbox[..., 2:4]) + 1e-8),
-        #     torch.sqrt(torch.abs(target_bbox[..., 2:4]) + 1e-8)).sum(-1)
-        loss_coord=mse(pred_bbox[...,:2],target_bbox[...,:2]).sum(-1)+\
-            mse(pred_bbox[..., 2:4], target_bbox[..., 2:4]).sum(-1)
+        loss_coord=mse(pred_bbox[...,:2],target_bbox[...,:2]).sum(-1)+mse(
+            torch.sqrt(torch.abs(pred_bbox[..., 2:4]) + 1e-8),
+            torch.sqrt(torch.abs(target_bbox[..., 2:4]) + 1e-8)).sum(-1)
+        # loss_coord=mse(pred_bbox[...,:2],target_bbox[...,:2]).sum(-1)+\
+        #     mse(pred_bbox[..., 2:4], target_bbox[..., 2:4]).sum(-1)
         # print(f'pred_conf.shape:{pred_conf.shape}, target_conf.shape:{target_conf.shape}')
         loss_confidence=mse(pred_conf,target_conf)
         # print(f'lambda_obj.shape:{lambda_obj.shape}, loss_coord.shape:{loss_coord.shape}, loss_confidence.shape:{loss_confidence.shape}')

@@ -43,6 +43,8 @@ def test():
 
             # predict
             pred_class, pred_coord, pred_conf=yolo_v1.forward(samples)
+
+            # save batch images with bbox
             bbox_utils.save_norm_imgs_with_bbox(samples, pred_class, pred_conf, 
                                           pred_coord, HyperParam.GRID_SIZE, conf_thresh)
 
