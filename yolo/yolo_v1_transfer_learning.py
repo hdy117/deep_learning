@@ -28,8 +28,9 @@ class YOLO_V1_Transfer(nn.Module):
             nn.BatchNorm1d(4096),
             nn.LeakyReLU(),
             nn.Linear(4096, 4096),
-            nn.ReLU(),
-            nn.Linear(4096, HyperParam.S*HyperParam.S*HyperParam.OUT_DIM)
+            nn.LeakyReLU(),
+            nn.Linear(4096, HyperParam.S*HyperParam.S*HyperParam.OUT_DIM),
+            nn.Softplus(beta=1)
         )
 
     def forward(self,img):
@@ -42,10 +43,14 @@ class YOLO_V1_Transfer(nn.Module):
         pred_coord=out[...,HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]
         pred_conf=out[...,HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]
 
-        confidence_sigmoid=nn.Sigmoid()
-        pred_conf=confidence_sigmoid(pred_conf)
-        class_sigmoid=nn.Sigmoid()
-        pred_class=class_sigmoid(pred_class)
+        # confidence_sigmoid=nn.Sigmoid()
+        # pred_conf=confidence_sigmoid(pred_conf)
+
+        # class_sigmoid=nn.Sigmoid()
+        # pred_class=class_sigmoid(pred_class)
+
+        # coord_relu=nn.ReLU()
+        # pred_coord=coord_relu(pred_coord)
 
         return pred_class, pred_coord, pred_conf
     
