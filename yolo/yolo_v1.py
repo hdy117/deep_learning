@@ -67,7 +67,7 @@ class COCODataset(Dataset):
         for anno_info in anno_infos:
             # label, [num_class,x,y,w,h,confidence]
             # get annotation
-            anno_info['bbox']=coco_dataset.ImgLabelResize.label_resize(origin_width,origin_height,anno_info['bbox'],self.img_new_size)
+            anno_info["bbox"]=coco_dataset.ImgLabelResize.label_resize(origin_width,origin_height,anno_info['bbox'],self.img_new_size)
             
             # get category id
             category_id=anno_info['category_id']
@@ -77,7 +77,7 @@ class COCODataset(Dataset):
                 continue
             
             # bounding box，[top_left_x,top_left_y,w,h]
-            x,y,w,h=anno_info['bbox'][0],anno_info['bbox'][1],anno_info['bbox'][2],anno_info['bbox'][3]
+            x,y,w,h=anno_info["bbox"][0],anno_info["bbox"][1],anno_info["bbox"][2],anno_info["bbox"][3]
             
             # grid coordinate
             x,y=x+w/2,y+h/2 # center of bbox
@@ -85,7 +85,7 @@ class COCODataset(Dataset):
 
             # num class
             if grid_i>=HyperParam.S or grid_j>=HyperParam.S:
-                print(f'anno_info["bbox"]:{anno_info["bbox"]}')
+                print(f'anno_info["bbox"]:{anno_info["bbox"]}, anno_info:{anno_info}')
                 print(f'grid_i:{grid_i},grid_j:{grid_j},x:{x},y:{y},grid_size:{HyperParam.GRID_SIZE}')
                 continue
             labels[grid_i,grid_j,0:HyperParam.NUM_CLASS]=torch.zeros(HyperParam.NUM_CLASS) # clear class

@@ -12,7 +12,7 @@ from dataset import coco_dataset
 from dataset import bbox_utils
 
 if __name__ == "__main__":
-    coco_dataset=COCODataset(coco_dataset.coco_val_img_dir,anno_file_path=coco_dataset.coco_val_sub_annotation_file)
+    coco_dataset=COCODataset(coco_dataset.coco_train_img_dir,anno_file_path=coco_dataset.coco_train_sub_annotation_file)
     bbox_saver=bbox_utils.BBOXUtils(out_folder='bbox_test')
 
     for idx,(sample,labels) in enumerate(coco_dataset):
