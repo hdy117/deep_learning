@@ -6,7 +6,7 @@ from yolo_v1 import *
 
 # file_path
 g_file_path=os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(g_file_path,".."))
+sys.path.append(os.path.join(g_file_path,"..",'dataset'))
 
 from dataset import coco_dataset
 from dataset import bbox_utils

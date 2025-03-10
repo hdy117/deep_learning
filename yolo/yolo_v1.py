@@ -76,10 +76,11 @@ class COCODataset(Dataset):
             if category_id not in HyperParam.TARGET_CLASS_LABELS:
                 continue
             
-            # bounding box
+            # bounding box，[top_left_x,top_left_y,w,h]
             x,y,w,h=anno_info['bbox'][0],anno_info['bbox'][1],anno_info['bbox'][2],anno_info['bbox'][3]
             
             # grid coordinate
+            x,y=x+w/2,y+h/2 # center of bbox
             grid_i,grid_j=int(x//HyperParam.GRID_SIZE),int(y//HyperParam.GRID_SIZE)
 
             # num class
