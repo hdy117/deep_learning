@@ -110,11 +110,10 @@ class BBOXUtils:
         batch_size=imgs.shape[0] # batch size
 
         for i in range(batch_size):
-            # convert img tensor to pil image
+            # convert img tensor
             img_tensor:torch.Tensor=imgs[i].cpu() # img tensor
-            img_tensor=img_tensor.permute(1,2,0)
-            img_tensor=(img_tensor*255).clip(0,255).byte()
 
+            # save image with bbox
             self.save_one_norm_img_with_bbox(img_tensor, pred_class[i],pred_conf[i],pred_bbox[i],
                                              grid_size,conf_thresh,self.img_idx)
             self.img_idx+=1
