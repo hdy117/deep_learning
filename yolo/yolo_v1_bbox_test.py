@@ -19,5 +19,5 @@ if __name__ == "__main__":
         target_class = labels[..., :HyperParam.NUM_CLASS]   # Ground truth class
         target_conf = labels[..., HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]  # Ground truth confidence
         target_bbox = labels[..., HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE] # Ground truth bounding box
-        bbox_saver.save_one_img_with_bbox(sample, target_class, target_conf, target_bbox, grid_size=HyperParam.GRID_SIZE,conf_thresh=0.9,img_idx=idx)
+        bbox_saver.save_one_norm_img_with_bbox(sample, target_class, target_conf, target_bbox, grid_size=HyperParam.GRID_SIZE,conf_thresh=0.9,img_idx=idx)
 
