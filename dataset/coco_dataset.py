@@ -70,10 +70,10 @@ class ImgLabelResize:
 
         # x,y,width,height
         x,y,width,height=bbox[0],bbox[1],bbox[2],bbox[3]
-        x=ratio*x+padding_width_half
-        y=ratio*y+padding_height_half
-        width=ratio*width
-        height=ratio*height
+        x=int(ratio*x+padding_width_half)
+        y=int(ratio*y+padding_height_half)
+        width=int(ratio*width)
+        height=int(ratio*height)
 
         return [x,y,width,height]
 
@@ -105,7 +105,7 @@ class COCOParser:
                         ]
                     ],
                     "area": 10000,
-                    "bbox": [x, y, width, height],
+                    "bbox": [top_left_x, top_left_y, width, height],
                     "iscrowd": 0
                 },
                 ...
@@ -175,7 +175,7 @@ class COCOParser:
 
         # get image info
         img_infos=self.get_img_infos()
-        img_info=img_infos[20]
+        img_info=img_infos[15]
         print(f'img_name:{self.get_img_name(img_info)}, img_id:{self.get_img_id(img_info)}')
 
         # load image
@@ -187,11 +187,12 @@ class COCOParser:
         # get image annotation of an image
         anno_infos=self.get_annotation_infos_by_img_id(self.get_img_id(img_info))
         for anno_info in anno_infos:
-            print(f'anno_info, category_id:{anno_info["category_id"]}, bbox:{anno_info["bbox"]}')
+            print(f'anno_info:{anno_info}, category_id:{anno_info["category_id"]}, bbox:{anno_info["bbox"]}')
             cat_info=self.get_category_info(anno_info["category_id"])
             print(f'category_id:{anno_info["category_id"]}, cat_info:{cat_info}')
-            anno_info['bbox']=ImgLabelResize.label_resize(origin_width,origin_height,anno_info['bbox'],224)
-            anno_info['segmentation']=[] # clear segmentation for now
+            anno_info["bbox"]=ImgLabelResize.label_resize(origin_width,origin_height,anno_info["bbox"],224)
+            print(f'anno_info:{anno_info}')
+            anno_info["segmentation"]=[] # clear segmentation for now
             print(f'bbox:{anno_info["bbox"]}')
 
         plt.imshow(img_data)
@@ -200,10 +201,10 @@ class COCOParser:
 
 
 if __name__=="__main__":
-    coco_train_parser=COCOParser(img_dir=coco_train_img_dir, annotation_file=coco_train_annotation_file)
+    coco_train_parser=COCOParser(img_dir=coco_train_img_dir, annotation_file=coco_train_sub_annotation_file)
     coco_train_parser.test_get_annotation()
 
-    coco_test_parser=COCOParser(img_dir=coco_val_img_dir, annotation_file=coco_val_annotation_file)
+    coco_test_parser=COCOParser(img_dir=coco_val_img_dir, annotation_file=coco_val_sub_annotation_file)
     coco_test_parser.test_get_annotation()
 
 

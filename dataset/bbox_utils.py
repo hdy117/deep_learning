@@ -14,7 +14,7 @@ class BBOXUtils:
         self.out_folder:str=out_folder
 
         os.makedirs(out_folder, exist_ok=True)
-    
+
     def save_one_img_with_bbox(self,img:Image, bboxs:list[list[int]],img_idx:int=0):
         '''
         draw resized image and labels
@@ -23,22 +23,30 @@ class BBOXUtils:
         # print(f"img center pixel:{np.array(img_pil)[112,112]}")
 
         width,height=img_pil.size
-        draw = ImageDraw.Draw(img_pil)
+        draw = ImageDraw.Draw(img_pil,mode="RGB")
         
         # get and draw bbox
         for bbox in bboxs:
             # extract bbox if condidence is greater than conf_thresh
             [x,y,w,h]=bbox
-            x_top_left=int(x-w/2)
-            y_top_left=int(y-h/2)
-            x_down_right=int(x+w/2)
-            y_down_right=int(y+h/2)
-            print(f'{x_top_left},{y_top_left},{x_down_right},{y_down_right}')
+
+            x_top_left = int(x)
+            y_top_left = int(y)
+            x_down_right = int(x + w)
+            y_down_right = int(y + h)
+
+            # 处理边界框坐标超出图像尺寸的情况
+            x_top_left = max(0, x_top_left)
+            y_top_left = max(0, y_top_left)
+            x_down_right = min(width, x_down_right)
+            y_down_right = min(height, y_down_right)
+            print(f'x_top_left:{x_top_left},y_top_left:{y_top_left},x_down_right:{x_down_right},y_down_right:{y_down_right}')
 
             # draw bbox
-            draw.rectangle([x_top_left,y_top_left,x_down_right,y_down_right], outline="red", width=2)  # outline颜色，width线宽
+            draw.rectangle([(x_top_left,y_top_left),(x_down_right,y_down_right)], outline="red", width=1)  # outline颜色，width线宽
         
         # save image
+        # img_pil = Image.alpha_composite(draw, img_pil)
         out_img_path=os.path.join(self.out_folder, f'{self.img_prefix}{img_idx}.jpg')
         img_pil.save(out_img_path)
 
@@ -80,7 +88,7 @@ class BBOXUtils:
                     print(f'{x_top_left},{y_top_left},{x_down_right},{y_down_right}')
 
                     # draw bbox
-                    draw.rectangle([x_top_left,y_top_left,x_down_right,y_down_right], outline="red", width=2)  # outline颜色，width线宽
+                    draw.rectangle([(x_top_left,y_top_left),(x_down_right,y_down_right)], outline="red", width=2)  # outline颜色，width线宽
         
         # save image
         out_img_path=os.path.join(self.out_folder, f'{self.img_prefix}{img_idx}.jpg')
@@ -128,7 +136,7 @@ class BBOXUtils:
                         print(f'{x_top_left},{y_top_left},{x_down_right},{y_down_right}')
 
                         # draw bbox
-                        draw.rectangle([x_top_left,y_top_left,x_down_right,y_down_right], outline="red", width=2)  # outline颜色，width线宽
+                        draw.rectangle([(x_top_left,y_top_left),(x_down_right,y_down_right)], outline="red", width=2)  # outline颜色，width线宽
             
             # save image
             out_img_path=os.path.join(self.out_folder, f'{self.img_prefix}{self.img_idx}.jpg')
@@ -137,7 +145,7 @@ class BBOXUtils:
 
         
 if __name__=="__main__":
-    coco_parser=coco_dataset.COCOParser(img_dir=coco_dataset.coco_train_img_dir, annotation_file=coco_dataset.coco_train_sub_annotation_file)
+    coco_parser=coco_dataset.COCOParser(img_dir=coco_dataset.coco_val_img_dir, annotation_file=coco_dataset.coco_val_sub_annotation_file)
     bbox_utils=BBOXUtils(out_folder="bbox_test")
 
     # num of images
@@ -147,6 +155,7 @@ if __name__=="__main__":
     img_infos=coco_parser.get_img_infos()
     img_idx=0
     for img_info in img_infos:
+        print("=================================")
         print(f'img_name:{coco_parser.get_img_name(img_info)}, img_id:{coco_parser.get_img_id(img_info)}')
 
         # load image
@@ -159,13 +168,14 @@ if __name__=="__main__":
         anno_infos=coco_parser.get_annotation_infos_by_img_id(coco_parser.get_img_id(img_info))
         bboxs=[]
         for anno_info in anno_infos:
-            print(f'anno_info, category_id:{anno_info["category_id"]}, bbox:{anno_info["bbox"]}')
+            # print(f'anno_info, category_id:{anno_info["category_id"]}, bbox:{anno_info["bbox"]}')
             cat_info=coco_parser.get_category_info(anno_info["category_id"])
-            print(f'category_id:{anno_info["category_id"]}, cat_info:{cat_info}')
-            anno_info['bbox']=coco_dataset.ImgLabelResize.label_resize(origin_width,origin_height,anno_info['bbox'],224)
-            anno_info['segmentation']=[] # clear segmentation for now
-            print(f'bbox:{anno_info["bbox"]}')
-            bboxs.append(anno_info["bbox"])
+            if anno_info["category_id"]==3:
+                # print(f'category_id:{anno_info["category_id"]}, cat_info:{cat_info}')
+                anno_info["bbox"]=coco_dataset.ImgLabelResize.label_resize(origin_width,origin_height,anno_info["bbox"],224)
+                anno_info['segmentation']=[] # clear segmentation for now
+                print(f'bbox:{anno_info["bbox"]}, anno_info:{anno_info}')
+                bboxs.append(anno_info["bbox"])
         
         # save resized img and label
         bbox_utils.save_one_img_with_bbox(img=img_data,bboxs=bboxs,img_idx=img_idx)
