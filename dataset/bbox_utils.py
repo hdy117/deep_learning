@@ -73,9 +73,10 @@ class BBOXUtils:
                     print(f'******************************')
                     # extract bbox if condidence is greater than conf_thresh
                     [x,y,w,h]=pred_bbox[grid_i, grid_j].tolist()
-                    
+                    print(f'origin x:{x},y:{y},w:{w},h:{h}')
                     # check
-                    if w<=0.0 or h<=0.0 or x<0.0 or y<0.0:
+                    if w<0.0 or h<0.0 or x<0.0 or y<0.0:
+                        print(f'w,h,x,y,is less than 0.0')
                         continue
 
                     # de-normalize bbox
@@ -88,10 +89,12 @@ class BBOXUtils:
                     y_top_left=max(0,int(y-h/2))
                     x_down_right=min(width,int(x+w/2))
                     y_down_right=min(height,int(y+h/2))
-                    if x_top_left>x_down_right or y_top_left>y_down_right:
-                        continue
                     print(f'x:{x},y:{y},w:{w},h:{h}')
                     print(f'{x_top_left},{y_top_left},{x_down_right},{y_down_right}')
+                    if x_top_left>x_down_right or y_top_left>y_down_right:
+                        continue
+                    # print(f'x:{x},y:{y},w:{w},h:{h}')
+                    # print(f'{x_top_left},{y_top_left},{x_down_right},{y_down_right}')
 
                     # draw bbox
                     draw.rectangle([(x_top_left,y_top_left),(x_down_right,y_down_right)], outline="red", width=2)  # outline颜色，width线宽
