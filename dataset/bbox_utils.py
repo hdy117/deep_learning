@@ -42,7 +42,6 @@ class BBOXUtils:
         out_img_path=os.path.join(self.out_folder, f'{self.img_prefix}{img_idx}.jpg')
         img_pil.save(out_img_path)
 
-    
     def save_one_norm_img_with_bbox(self, imgs:torch.Tensor, pred_class:torch.Tensor, 
                            pred_conf:torch.Tensor, pred_bbox:torch.Tensor, 
                            grid_size:int=224//7, conf_thresh=0.6, img_idx:int=0):
