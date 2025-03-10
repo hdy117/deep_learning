@@ -28,9 +28,9 @@ class YOLO_V1_Transfer(nn.Module):
             nn.BatchNorm1d(4096),
             nn.LeakyReLU(),
             nn.Linear(4096, 4096),
+            nn.BatchNorm1d(4096),
             nn.LeakyReLU(),
             nn.Linear(4096, HyperParam.S*HyperParam.S*HyperParam.OUT_DIM),
-            nn.ReLU()
         )
 
     def forward(self,img):
