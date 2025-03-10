@@ -33,7 +33,7 @@ class YOLO_V1_Transfer(nn.Module):
         )
 
     def forward(self,img):
-        out= x = self.features(img)
+        out= x = self.vgg_features(img)
         out=out.view(-1,512*7*7)
         out=self.fc(out)
         out=out.view(-1,HyperParam.S,HyperParam.S,HyperParam.OUT_DIM)
@@ -76,6 +76,8 @@ def train():
         yolo_v1_transfer.eval()
         print(f'yolo v1 trained model loaded from {HyperParam.model_path}')
 
+    best_loss=1e12
+
     # training
     for epoch in range(HyperParam.n_epoch):
         print('================train==================')
@@ -99,13 +101,15 @@ def train():
 
             # loss
             if batch_idx%10==0:
+                if loss < best_loss:
+                    # save best model
+                    torch.save(yolo_v1_transfer.state_dict(),HyperParam.model_path)
+                    best_loss=loss
+                    print(f'********save best model with loss:{best_loss}***********')
                 print(f'epoch:{epoch}, batch idx:{batch_idx},loss:{loss.item()}')
 
         # update learning rate
         scheduler.step()
-
-        # save model
-        torch.save(yolo_v1_transfer.state_dict(),HyperParam.model_path)
 
 if __name__=="__main__":
     train()
