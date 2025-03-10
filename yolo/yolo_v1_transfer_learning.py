@@ -30,7 +30,7 @@ class YOLO_V1_Transfer(nn.Module):
             nn.Linear(4096, 4096),
             nn.LeakyReLU(),
             nn.Linear(4096, HyperParam.S*HyperParam.S*HyperParam.OUT_DIM),
-            nn.Softplus(beta=1)
+            nn.ReLU()
         )
 
     def forward(self,img):
