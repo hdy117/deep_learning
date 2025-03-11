@@ -31,6 +31,7 @@ class YOLO_V1_Transfer(nn.Module):
             nn.BatchNorm1d(4096),
             nn.LeakyReLU(),
             nn.Linear(4096, HyperParam.S*HyperParam.S*HyperParam.OUT_DIM),
+            nn.Sigmoid()
         )
 
     def forward(self,img):
@@ -49,8 +50,8 @@ class YOLO_V1_Transfer(nn.Module):
         # class_sigmoid=nn.Sigmoid()
         # pred_class=class_sigmoid(pred_class)
 
-        # coord_relu=nn.ReLU()
-        # pred_coord=coord_relu(pred_coord)
+        # coord_sigmoid=nn.Sigmoid()
+        # pred_coord=coord_sigmoid(pred_coord)
 
         return pred_class, pred_coord, pred_conf
     
@@ -71,7 +72,7 @@ for param in yolo_v1_transfer.vgg_features.parameters():
 
 # optimizer
 optimizer=torch.optim.Adam(yolo_v1_transfer.parameters(),lr=HyperParam.learning_rate,weight_decay=HyperParam.weight_decay)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
 criterion=YOLO_V1_Loss()
 
 def train():
