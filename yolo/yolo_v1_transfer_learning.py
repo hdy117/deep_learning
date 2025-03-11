@@ -106,11 +106,11 @@ def train():
 
             # loss
             if batch_idx%10==0:
-                if loss < best_loss:
-                    # save best model
-                    torch.save(yolo_v1_transfer.state_dict(),HyperParam.model_path)
-                    best_loss=loss
-                    print(f'********save best model with loss:{best_loss}***********')
+                # if loss < best_loss:
+                #     # save best model
+                #     torch.save(yolo_v1_transfer.state_dict(),HyperParam.model_path)
+                #     best_loss=loss
+                #     print(f'********save best model with loss:{best_loss}***********')
                 print(f'epoch:{epoch}, batch idx:{batch_idx},loss:{loss.item()}')
 
         # update learning rate
