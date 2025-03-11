@@ -73,7 +73,7 @@ class BBOXUtils:
                     print(f'******************************')
                     # extract bbox if condidence is greater than conf_thresh
                     [x,y,w,h]=pred_bbox[grid_i, grid_j].tolist()
-                    print(f'origin x:{x},y:{y},w:{w},h:{h}')
+                    print(f'{pred_bbox.shape[0]},{pred_bbox.shape[1]},conf:{pred_conf[grid_i,grid_j]},grid_i:{grid_i},grid_j:{grid_j},origin x:{x},y:{y},w:{w},h:{h}')
                     # check
                     if w<0.0 or h<0.0 or x<0.0 or y<0.0:
                         print(f'w,h,x,y,is less than 0.0')
