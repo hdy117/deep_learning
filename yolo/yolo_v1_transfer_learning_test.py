@@ -35,7 +35,7 @@ def test():
         print('================test==================')
         n_total=0
         n_correct=0
-        conf_thresh=0.6
+        conf_thresh=0.5
         for batch_idx,(samples, labels) in enumerate(val_data_loader):
             # data to device
             samples=samples.to(HyperParam.device)
