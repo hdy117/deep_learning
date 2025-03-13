@@ -72,7 +72,7 @@ for param in yolo_v1_transfer.vgg_features.parameters():
 
 # optimizer
 optimizer=torch.optim.Adam(yolo_v1_transfer.parameters(),lr=HyperParam.learning_rate,weight_decay=HyperParam.weight_decay)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
 criterion=YOLO_V1_Loss()
 
 def train():
@@ -117,6 +117,7 @@ def train():
         # update learning rate
         scheduler.step()
 
+        # save
         torch.save(yolo_v1_transfer.state_dict(),HyperParam.model_path)
 
 if __name__=="__main__":
