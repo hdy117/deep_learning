@@ -156,7 +156,7 @@ class ResidualLoss(nn.Module):
 # hyper param
 device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_path=os.path.join(g_file_path,"residual_classification.pth")
-batch_size=64
+batch_size=128
 n_epoch=6
 img_new_size=224
 target_class=[1,2,3,4,5,6,7,8,9,10] # coco category [person, bicycle, car]
