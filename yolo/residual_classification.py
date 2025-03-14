@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
-from torchvision.transforms import transforms
+import torchvision.transforms as transforms
 import os,sys
 import matplotlib.pyplot as plt
 
@@ -34,7 +34,7 @@ class COCODataset(Dataset):
 
         # load and resize image
         img_pil=self.coco_parser.load_img(self.coco_parser.get_img_name(img_info=img_info))
-        origin_width, origin_height=img_pil.size
+        # origin_width, origin_height=img_pil.size
         img_pil=coco_dataset.ImgLabelResize.image_resize(img=img_pil,new_size=self.img_new_size)
         # new_width, new_height=img_pil.size
 
@@ -45,8 +45,6 @@ class COCODataset(Dataset):
         anno_infos=self.coco_parser.get_annotation_infos_by_img_id(img_id)
 
         for anno_info in anno_infos:
-            # label, [num_class]
-
             # get category id
             category_id=anno_info['category_id']
             
@@ -114,9 +112,11 @@ class ResidualClassification(nn.Module):
         self.conv3=ResConv2dBlock(in_channels=64,out_channels=128) # (128,28,28)
         # conv4
         self.conv4=ResConv2dBlock(in_channels=128,out_channels=256) # (256,14,14)
+        # conv4
+        self.conv5=ResConv2dBlock(in_channels=256,out_channels=512) # (512,7,7)
         # fc
         self.fc = nn.Sequential(
-            nn.Linear(256*14*14, 4096),
+            nn.Linear(512*7*7, 4096),
             nn.BatchNorm1d(4096),
             nn.LeakyReLU(),
             nn.Linear(4096, 4096),
@@ -129,15 +129,16 @@ class ResidualClassification(nn.Module):
         '''
         residual conv2d feature, output is [batch_size, 256, 14, 14]
         '''
-        out=self.conv1.forward(x)
-        out=self.conv2.forward(out)
-        out=self.conv3.forward(out)
-        out=self.conv4.forward(out)
+        out=self.conv1(x)
+        out=self.conv2(out)
+        out=self.conv3(out)
+        out=self.conv4(out)
+        out=self.conv5(out)
         return out
 
     def forward(self,img):
         out=self.features(img)
-        out=out.view(-1,256*14*14)
+        out=out.view(-1,512*7*7)
         out=self.fc(out)
         return out
 
@@ -145,19 +146,19 @@ class ResidualClassification(nn.Module):
 class ResidualLoss(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.loss=nn.BCEWithLogitsLoss()
     
     def forward(self,y_pred,label):
-        mse=nn.MSELoss()
-        loss=mse(y_pred,label)
+        loss=self.loss(y_pred,label)
         return loss
 
 # hyper param
 device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_path=os.path.join(g_file_path,"residual_classification.pth")
 batch_size=64
-n_epoch=90
+n_epoch=60
 img_new_size=224
-target_class=[1,2,3] # coco category [person, bicycle, car]
+target_class=[1,2,3,4,5,6,7,8,9,10] # coco category [person, bicycle, car]
 
 # train dataloader
 transform = transforms.Compose([
@@ -182,7 +183,7 @@ def test():
         print('================test==================')
         n_total=0
         n_correct=0
-        conf_thresh=0.8
+        conf_thresh=0.9
         for batch_idx,(samples, labels) in enumerate(val_data_loader):
             # data to device
             samples=samples.to(device)
@@ -191,14 +192,17 @@ def test():
             # predict
             y_pred=residual_model.forward(samples)
 
-            # loss
+            # size
             batch_size=samples.shape[0]
-            out_dim=y_pred.shape[1]
-            n_total+=batch_size*out_dim
+            out_dim=samples.shape[1]
 
-            # for multiple class check
-            pred_obj=(y_pred>conf_thresh).float()
-            n_correct+=(pred_obj==labels).sum().item()
+            # calculate correction
+            y_pred_obj=(y_pred>conf_thresh).float()
+            correct_per_sample=(y_pred_obj==labels).sum().item()
+
+            # accuracy
+            n_correct += correct_per_sample
+            n_total += out_dim * batch_size
 
         # for multiple class
         print(f'test accuracy:{n_correct/n_total}, n_correct:{n_correct}, n_total:{n_total}')
@@ -216,7 +220,7 @@ residual_model=ResidualClassification(input_channel=3, out_dim=max(target_class)
 residual_model=residual_model.to(device)
 
 optimizer=torch.optim.Adam(residual_model.parameters(),lr=0.01,weight_decay=0.0006)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
 criterion=ResidualLoss()
 
 def train():
@@ -241,7 +245,7 @@ def train():
             y_pred=residual_model.forward(samples)
 
             # loss
-            loss=criterion(y_pred, labels)
+            loss=criterion.forward(y_pred, labels)
 
             # gradient descent
             loss.backward()
