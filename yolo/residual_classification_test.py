@@ -17,7 +17,8 @@ val_dataset=COCODataset(coco_dataset.coco_val_img_dir,
                         img_new_size=img_new_size,
                         target_class=target_class,
                         transform=transform)
-val_data_loader=DataLoader(dataset=val_dataset, shuffle=True, batch_size=batch_size)
+val_data_loader=DataLoader(dataset=val_dataset, shuffle=True, 
+                           batch_size=batch_size)
 
 # test
 def test():

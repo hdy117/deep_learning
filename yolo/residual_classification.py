@@ -157,7 +157,8 @@ class ResidualLoss(nn.Module):
 device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_path=os.path.join(g_file_path,"residual_classification.pth")
 batch_size=128
-n_epoch=6
+n_epoch=30
+lr_step_size=n_epoch//3
 img_new_size=224
 target_class=[1,2,3,4,5,6,7,8,9,10] # coco category [person, bicycle, car]
 
@@ -175,14 +176,15 @@ train_dataset=COCODataset(coco_dataset.coco_train_img_dir,
                           img_new_size=img_new_size,
                           target_class=target_class,
                           transform=transform)
-train_data_loader=DataLoader(dataset=train_dataset, shuffle=True, batch_size=batch_size)
+train_data_loader=DataLoader(dataset=train_dataset, shuffle=True, 
+                             batch_size=batch_size)
 
 # train
 residual_model=ResidualClassification(input_channel=3, out_dim=max(target_class))
 residual_model=residual_model.to(device)
 
 optimizer=torch.optim.Adam(residual_model.parameters(),lr=0.001,weight_decay=0.0001)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.1)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_step_size, gamma=0.1)
 criterion=ResidualLoss()
 
 def train():
@@ -222,9 +224,6 @@ def train():
 
         # save model
         torch.save(residual_model.state_dict(),model_path)
-
-        # test 
-        test()
 
 # main
 if __name__=="__main__":
