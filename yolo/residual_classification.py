@@ -119,8 +119,6 @@ class ResidualClassification(nn.Module):
             nn.Linear(512*7*7, 4096),
             nn.BatchNorm1d(4096),
             nn.LeakyReLU(),
-            nn.Linear(4096, 4096),
-            nn.LeakyReLU(),
             nn.Linear(4096, self.output_dim),
             nn.Sigmoid()
         )
@@ -144,13 +142,13 @@ class ResidualClassification(nn.Module):
 
 # residual loss
 class ResidualLoss(nn.Module):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self):
+        super().__init__()
         self.loss=nn.MSELoss(reduction='sum')
     
     def forward(self,y_pred,label):
         loss=self.loss(y_pred,label)
-        return loss.sum()
+        return loss
 
 # hyper param
 device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
