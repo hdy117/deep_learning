@@ -85,13 +85,14 @@ class ResConv2dBlock(nn.Module):
             nn.Conv2d(in_channels=self.out_channels//2,out_channels=self.out_channels-self.in_channels,kernel_size=1)
         )
 
-        self.residual=nn.Conv2d(in_channels=self.in_channels, out_channels=self.in_channels,kernel_size=1)
+        # self.residual=nn.Conv2d(in_channels=self.in_channels, out_channels=self.in_channels,kernel_size=1)
 
     def forward(self, x):
         # residual bottle neck
         bottle_neck=self.bottle_neck(x)
-        residual=self.residual(x)
-        out=torch.concat([bottle_neck,residual],dim=1)
+        # residual=self.residual(x)
+        # out=torch.concat([bottle_neck,residual],dim=1)
+        out=torch.concat([bottle_neck,x],dim=1)
 
         # avg pool 2d
         avg_pool2d=nn.AvgPool2d(2,2)
@@ -151,7 +152,7 @@ class ResidualLoss(nn.Module):
 device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_path=os.path.join(g_file_path,"residual_classification.pth")
 batch_size=64
-n_epoch=60
+n_epoch=6
 img_new_size=224
 target_class=[1,2,3,4,5,6,7,8,9,10] # coco category [person, bicycle, car]
 
@@ -226,7 +227,7 @@ residual_model=ResidualClassification(input_channel=3, out_dim=max(target_class)
 residual_model=residual_model.to(device)
 
 optimizer=torch.optim.Adam(residual_model.parameters(),lr=0.001,weight_decay=0.0001)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.1)
 criterion=ResidualLoss()
 
 def train():
