@@ -105,8 +105,12 @@ class ResidualClassification(nn.Module):
     def __init__(self,input_channel=3, out_dim=1):
         super().__init__()
         self.output_dim=out_dim
+        # conv0
+        self.conv0=nn.Sequential(
+            nn.Conv2d(in_channels=input_channel,out_channels=8,kernel_size=3,padding=1),
+        )
         # conv1
-        self.conv1=ResConv2dBlock(in_channels=input_channel,out_channels=32) # (32,112,112)
+        self.conv1=ResConv2dBlock(in_channels=8,out_channels=32) # (32,112,112)
         # conv2
         self.conv2=ResConv2dBlock(in_channels=32,out_channels=64) # (64,56,56)
         # conv3
@@ -126,7 +130,8 @@ class ResidualClassification(nn.Module):
         '''
         residual conv2d feature, output is [batch_size, 256, 14, 14]
         '''
-        out=self.conv1(x)
+        out=self.conv0(x)
+        out=self.conv1(out)
         out=self.conv2(out)
         out=self.conv3(out)
         out=self.conv4(out)
@@ -142,7 +147,7 @@ class ResidualClassification(nn.Module):
 class ResidualLoss(nn.Module):
     def __init__(self):
         super().__init__()
-        self.loss=nn.MSELoss(reduction='sum')
+        self.loss=nn.BCELoss(reduction='sum')
     
     def forward(self,y_pred,label):
         loss=self.loss(y_pred,label)
