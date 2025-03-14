@@ -79,7 +79,7 @@ def train():
     # load saved model
     if os.path.exists(HyperParam.model_path):
         yolo_v1_transfer.load_state_dict(torch.load(HyperParam.model_path))
-        yolo_v1_transfer.eval()
+        yolo_v1_transfer.train()
         print(f'yolo v1 trained model loaded from {HyperParam.model_path}')
 
     best_loss=1e12
