@@ -191,10 +191,10 @@ def train():
             optimizer.zero_grad()
 
             # predict
-            pred_class, pred_coord, pre_confidence=residual_model.forward(samples)
+            y_pred=residual_model.forward(samples)
 
             # loss
-            loss=criterion(pred_class, pred_coord, pre_confidence, labels)
+            loss=criterion(y_pred, labels)
 
             # gradient descent
             loss.backward()
