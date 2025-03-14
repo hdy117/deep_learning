@@ -76,22 +76,22 @@ class ResConv2dBlock(nn.Module):
         self.bottle_neck=nn.Sequential(
             nn.BatchNorm2d(in_channels),
             nn.LeakyReLU(),
-            nn.Conv2d(in_channels=self.in_channels, out_channels=self.out_channels//2,kernel_size=1),
+            nn.Conv2d(in_channels=self.in_channels,out_channels=self.out_channels//2,kernel_size=1),
             nn.BatchNorm2d(self.out_channels//2),
             nn.LeakyReLU(),
-            nn.Conv2d(in_channels=self.out_channels//2, out_channels=self.out_channels//2, kernel_size=kernel_size,padding=kernel_size//2),
+            nn.Conv2d(in_channels=self.out_channels//2,out_channels=self.out_channels//2,kernel_size=kernel_size,padding=kernel_size//2),
             nn.BatchNorm2d(self.out_channels//2),
             nn.LeakyReLU(),
-            nn.Conv2d(in_channels=self.out_channels//2, out_channels=self.out_channels-self.in_channels,kernel_size=1)
+            nn.Conv2d(in_channels=self.out_channels//2,out_channels=self.out_channels,kernel_size=1)
         )
 
-        self.residual=nn.Conv2d(in_channels=self.in_channels, out_channels=self.in_channels,kernel_size=1)
+        self.residual=nn.Conv2d(in_channels=self.in_channels, out_channels=self.out_channels,kernel_size=1)
 
     def forward(self, x):
         # residual bottle neck
         bottle_neck=self.bottle_neck(x)
         residual=self.residual(x)
-        out=torch.concat([bottle_neck,residual],dim=1)
+        out=bottle_neck+residual
 
         # avg pool 2d
         avg_pool2d=nn.AvgPool2d(2,2)
@@ -146,7 +146,7 @@ class ResidualClassification(nn.Module):
 class ResidualLoss(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.loss=nn.BCEWithLogitsLoss()
+        self.loss=nn.MSELoss()
     
     def forward(self,y_pred,label):
         loss=self.loss(y_pred,label)
@@ -178,6 +178,16 @@ val_data_loader=DataLoader(dataset=val_dataset, shuffle=True, batch_size=batch_s
 
 # test
 def test():
+    # load model
+    model=ResidualClassification(input_channel=3, out_dim=max(target_class))
+    model=residual_model.to(device)
+    if os.path.exists(model_path):
+        try:
+            model.load_state_dict(torch.load(model_path))
+            print(f'Model loaded from {model_path}')
+        except Exception as e:
+            print(f'Error loading model: {e}')
+
     # testing
     with torch.no_grad():
         print('================test==================')
@@ -190,7 +200,7 @@ def test():
             labels=labels.to(device)
 
             # predict
-            y_pred=residual_model.forward(samples)
+            y_pred=model.forward(samples)
 
             # size
             batch_size=samples.shape[0]
