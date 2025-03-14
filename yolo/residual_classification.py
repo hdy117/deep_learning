@@ -82,16 +82,16 @@ class ResConv2dBlock(nn.Module):
             nn.Conv2d(in_channels=self.out_channels//2,out_channels=self.out_channels//2,kernel_size=kernel_size,padding=kernel_size//2),
             nn.BatchNorm2d(self.out_channels//2),
             nn.LeakyReLU(),
-            nn.Conv2d(in_channels=self.out_channels//2,out_channels=self.out_channels,kernel_size=1)
+            nn.Conv2d(in_channels=self.out_channels//2,out_channels=self.out_channels-self.in_channels,kernel_size=1)
         )
 
-        self.residual=nn.Conv2d(in_channels=self.in_channels, out_channels=self.out_channels,kernel_size=1)
+        self.residual=nn.Conv2d(in_channels=self.in_channels, out_channels=self.in_channels,kernel_size=1)
 
     def forward(self, x):
         # residual bottle neck
         bottle_neck=self.bottle_neck(x)
         residual=self.residual(x)
-        out=bottle_neck+residual
+        out=torch.concat([bottle_neck,residual],dim=1)
 
         # avg pool 2d
         avg_pool2d=nn.AvgPool2d(2,2)
@@ -180,7 +180,7 @@ val_data_loader=DataLoader(dataset=val_dataset, shuffle=True, batch_size=batch_s
 def test():
     # load model
     model=ResidualClassification(input_channel=3, out_dim=max(target_class))
-    model=residual_model.to(device)
+    model=model.to(device)
     if os.path.exists(model_path):
         try:
             model.load_state_dict(torch.load(model_path))
