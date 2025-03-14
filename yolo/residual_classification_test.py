@@ -54,6 +54,12 @@ def test():
             y_pred_obj=(y_pred>conf_thresh).float()
             correct_per_sample=(y_pred_obj==labels).sum().item()
 
+            # print something
+            for batch in range(batch_size):
+                label_list = [f'{val:.2f}' for val in labels[batch].tolist()]
+                pred_list = [f'{val:.2f}' for val in y_pred[batch].tolist()]
+                print(f'label: {label_list}, pred: {pred_list}')
+
             # accuracy
             n_correct += correct_per_sample
             n_total += out_dim * batch_size
