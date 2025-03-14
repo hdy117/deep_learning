@@ -116,7 +116,7 @@ class ResidualClassification(nn.Module):
         self.conv5=ResConv2dBlock(in_channels=256,out_channels=512) # (512,7,7)
         # fc
         self.fc = nn.Sequential(
-            nn.Linear(512*7*7, 4096),
+            nn.Linear(256*14*14, 4096),
             nn.BatchNorm1d(4096),
             nn.LeakyReLU(),
             nn.Linear(4096, self.output_dim),
@@ -131,12 +131,12 @@ class ResidualClassification(nn.Module):
         out=self.conv2(out)
         out=self.conv3(out)
         out=self.conv4(out)
-        out=self.conv5(out)
+        # out=self.conv5(out)
         return out
 
     def forward(self,img):
         out=self.features(img)
-        out=out.view(-1,512*7*7)
+        out=out.view(-1,256*14*14)
         out=self.fc(out)
         return out
 
