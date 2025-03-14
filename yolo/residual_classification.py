@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from torchvision.transforms import transforms
 import os,sys
-import numpy as np
+import matplotlib.pyplot as plt
 
 # file_path
 g_file_path=os.path.dirname(os.path.abspath(__file__))
@@ -26,7 +26,7 @@ class COCODataset(Dataset):
 
     def __getitem__(self, index):
         """
-        # label, [num_class,x,y,w,h,confidence]
+        # label, [num_class]
         # image, [channel,width,height], range [0,255]
         """
         img_info=self.img_infos[index]
@@ -45,23 +45,27 @@ class COCODataset(Dataset):
         anno_infos=self.coco_parser.get_annotation_infos_by_img_id(img_id)
 
         for anno_info in anno_infos:
-            # label, [num_class,x,y,w,h,confidence]
-            # get annotation
-            bbox=coco_dataset.ImgLabelResize.label_resize(origin_width,origin_height,anno_info['bbox'],self.img_new_size)
-            
+            # label, [num_class]
+
             # get category id
             category_id=anno_info['category_id']
             
             # only detect category in HyperParam.TARGET_CLASS_LABELS
-            if category_id not in self.target_class:
-                continue
+            if category_id in self.target_class:
+                # num class
+                labels[category_id-1]=1.0 # class
 
-            # num class
-            labels[category_id-1]=1.0 # class
+        # show img
+        # print(f'labels:{labels}')
+        # img_pil.show()
 
         if self.transform:
-            img_data=self.transform(img_pil)
-        return img_data, labels
+            img_pil=self.transform(img_pil)
+        
+        # print img
+        # print(f'img_pil:{img_pil.mean()}')
+
+        return img_pil, labels
 
 # residual block
 class ResConv2dBlock(nn.Module):
@@ -74,23 +78,27 @@ class ResConv2dBlock(nn.Module):
         self.bottle_neck=nn.Sequential(
             nn.BatchNorm2d(in_channels),
             nn.LeakyReLU(),
-            nn.Conv2d(in_channels=self.in_channels, out_channels=self.out_channels//4,kernel_size=1),
-            nn.BatchNorm2d(self.out_channels//4),
+            nn.Conv2d(in_channels=self.in_channels, out_channels=self.out_channels//2,kernel_size=1),
+            nn.BatchNorm2d(self.out_channels//2),
             nn.LeakyReLU(),
-            nn.Conv2d(in_channels=self.out_channels//4, out_channels=self.out_channels//4, kernel_size=kernel_size,padding=kernel_size//2),
-            nn.BatchNorm2d(self.out_channels//4),
+            nn.Conv2d(in_channels=self.out_channels//2, out_channels=self.out_channels//2, kernel_size=kernel_size,padding=kernel_size//2),
+            nn.BatchNorm2d(self.out_channels//2),
             nn.LeakyReLU(),
-            nn.Conv2d(in_channels=self.out_channels//4, out_channels=self.out_channels//2,kernel_size=1)
+            nn.Conv2d(in_channels=self.out_channels//2, out_channels=self.out_channels-self.in_channels,kernel_size=1)
         )
 
-        self.residual=nn.Conv2d(in_channels=self.in_channels, out_channels=self.out_channels//2,kernel_size=1)
+        self.residual=nn.Conv2d(in_channels=self.in_channels, out_channels=self.in_channels,kernel_size=1)
 
     def forward(self, x):
+        # residual bottle neck
         bottle_neck=self.bottle_neck(x)
         residual=self.residual(x)
         out=torch.concat([bottle_neck,residual],dim=1)
+
+        # avg pool 2d
         avg_pool2d=nn.AvgPool2d(2,2)
         out=avg_pool2d(out)
+
         return out
 
 # residual classification
@@ -98,15 +106,15 @@ class ResidualClassification(nn.Module):
     def __init__(self,input_channel=3, out_dim=1):
         super().__init__()
         self.output_dim=out_dim
-        # 第一层卷积
+        # conv1
         self.conv1=ResConv2dBlock(in_channels=input_channel,out_channels=32) # (32,112,112)
-        # 第二层卷积
+        # conv2
         self.conv2=ResConv2dBlock(in_channels=32,out_channels=64) # (64,56,56)
-        # 第三层卷积
+        # conv3
         self.conv3=ResConv2dBlock(in_channels=64,out_channels=128) # (128,28,28)
-        # 第四层卷积
+        # conv4
         self.conv4=ResConv2dBlock(in_channels=128,out_channels=256) # (256,14,14)
-        # 全连接层
+        # fc
         self.fc = nn.Sequential(
             nn.Linear(256*14*14, 4096),
             nn.BatchNorm1d(4096),
@@ -121,10 +129,10 @@ class ResidualClassification(nn.Module):
         '''
         residual conv2d feature, output is [batch_size, 256, 14, 14]
         '''
-        out=self.conv1(x)
-        out=self.conv2(out)
-        out=self.conv3(out)
-        out=self.conv4(out)
+        out=self.conv1.forward(x)
+        out=self.conv2.forward(out)
+        out=self.conv3.forward(out)
+        out=self.conv4.forward(out)
         return out
 
     def forward(self,img):
@@ -147,7 +155,8 @@ class ResidualLoss(nn.Module):
 device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_path=os.path.join(g_file_path,"residual_classification.pth")
 batch_size=64
-epoch=90
+n_epoch=90
+img_new_size=224
 target_class=[1,2,3] # coco category [person, bicycle, car]
 
 # train dataloader
@@ -157,9 +166,47 @@ transform = transforms.Compose([
     # 对图像进行归一化处理
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
+
+# test dataloader
+val_dataset=COCODataset(coco_dataset.coco_val_img_dir,
+                        coco_dataset.coco_val_sub_annotation_file,
+                        img_new_size=img_new_size,
+                        target_class=target_class,
+                        transform=transform)
+val_data_loader=DataLoader(dataset=val_dataset, shuffle=True, batch_size=batch_size)
+
+# test
+def test():
+    # testing
+    with torch.no_grad():
+        print('================test==================')
+        n_total=0
+        n_correct=0
+        conf_thresh=0.8
+        for batch_idx,(samples, labels) in enumerate(val_data_loader):
+            # data to device
+            samples=samples.to(device)
+            labels=labels.to(device)
+
+            # predict
+            y_pred=residual_model.forward(samples)
+
+            # loss
+            batch_size=samples.shape[0]
+            out_dim=y_pred.shape[1]
+            n_total+=batch_size*out_dim
+
+            # for multiple class check
+            pred_obj=(y_pred>conf_thresh).float()
+            n_correct+=(pred_obj==labels).sum().item()
+
+        # for multiple class
+        print(f'test accuracy:{n_correct/n_total}, n_correct:{n_correct}, n_total:{n_total}')
+
+# train dataloader
 train_dataset=COCODataset(coco_dataset.coco_train_img_dir,
                           coco_dataset.coco_train_sub_annotation_file,
-                          img_new_size=224,
+                          img_new_size=img_new_size,
                           target_class=target_class,
                           transform=transform)
 train_data_loader=DataLoader(dataset=train_dataset, shuffle=True, batch_size=batch_size)
@@ -180,7 +227,7 @@ def train():
         print(f'yolo v1 trained model loaded from {model_path}')
 
     # training
-    for epoch in range(epoch):
+    for epoch in range(n_epoch):
         print('================train==================')
         for batch_idx,(samples, labels) in enumerate(train_data_loader):
             # data to device
@@ -209,6 +256,9 @@ def train():
 
         # save model
         torch.save(residual_model.state_dict(),model_path)
+
+        # test 
+        test()
 
 # main
 if __name__=="__main__":

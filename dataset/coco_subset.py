@@ -77,7 +77,7 @@ class COCOSubset:
 
 if __name__=="__main__":
     # sub_category_id=[1,2,3] # person, bicycle, car
-    sub_category_id=[3] # person, bicycle, car
+    sub_category_id=[1,2,3] # person, bicycle, car
 
     coco_sub_train=COCOSubset(sub_category_id=sub_category_id,
                               coco_img_dir=coco_train_img_dir,
