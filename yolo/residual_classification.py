@@ -199,8 +199,8 @@ def test():
             y_pred=model.forward(samples)
 
             # size
-            batch_size=samples.shape[0]
-            out_dim=samples.shape[1]
+            batch_size=y_pred.shape[0]
+            out_dim=y_pred.shape[1]
 
             # calculate correction
             y_pred_obj=(y_pred>conf_thresh).float()
