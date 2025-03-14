@@ -146,11 +146,10 @@ class ResidualClassification(nn.Module):
 class ResidualLoss(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.loss=nn.MSELoss()
+        self.loss=nn.MSELoss(reduction='sum')
     
     def forward(self,y_pred,label):
-        # loss=self.loss(y_pred,label)
-        loss=(y_pred-label)**2
+        loss=self.loss(y_pred,label)
         return loss.sum()
 
 # hyper param
