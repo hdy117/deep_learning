@@ -231,7 +231,7 @@ train_data_loader=DataLoader(dataset=train_dataset, shuffle=True, batch_size=bat
 residual_model=ResidualClassification(input_channel=3, out_dim=max(target_class))
 residual_model=residual_model.to(device)
 
-optimizer=torch.optim.Adam(residual_model.parameters(),lr=0.001,weight_decay=0.0006)
+optimizer=torch.optim.Adam(residual_model.parameters(),lr=0.001,weight_decay=0.0001)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
 criterion=ResidualLoss()
 
