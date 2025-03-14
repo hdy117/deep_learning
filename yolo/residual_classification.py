@@ -120,7 +120,7 @@ class ResidualClassification(nn.Module):
             nn.BatchNorm1d(4096),
             nn.LeakyReLU(),
             nn.Linear(4096, 4096),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(4096, self.output_dim),
             nn.Sigmoid()
         )
@@ -149,8 +149,9 @@ class ResidualLoss(nn.Module):
         self.loss=nn.MSELoss()
     
     def forward(self,y_pred,label):
-        loss=self.loss(y_pred,label)
-        return loss
+        # loss=self.loss(y_pred,label)
+        loss=(y_pred-label)**2
+        return loss.sum()
 
 # hyper param
 device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -184,6 +185,7 @@ def test():
     if os.path.exists(model_path):
         try:
             model.load_state_dict(torch.load(model_path))
+            model.eval()
             print(f'Model loaded from {model_path}')
         except Exception as e:
             print(f'Error loading model: {e}')
@@ -237,7 +239,7 @@ def train():
     # load saved model
     if os.path.exists(model_path):
         residual_model.load_state_dict(torch.load(model_path))
-        residual_model.eval()
+        residual_model.train()
         print(f'yolo v1 trained model loaded from {model_path}')
 
     # training
