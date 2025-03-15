@@ -63,7 +63,7 @@ yolo_v1_transfer=yolo_v1_transfer.to(HyperParam.device)
 HyperParam.model_path=os.path.join(g_file_path, 'yolo_v1_transfer.pth')
 
 # 冻结 VGG 模型的卷积层
-for param in yolo_v1_transfer.residual.parameters():
+for param in yolo_v1_transfer.residual.features.parameters():
     param.requires_grad = False
 
 # optimizer
