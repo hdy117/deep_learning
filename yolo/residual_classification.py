@@ -156,11 +156,13 @@ class ResidualLoss(nn.Module):
 # hyper param
 device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_path=os.path.join(g_file_path,"residual_classification.pth")
-batch_size=128
+batch_size=64
 n_epoch=30
+lr=0.001
+weight_decay=0.0001
 lr_step_size=n_epoch//3
 img_new_size=224
-target_class=[1,2,3,4,5,6,7,8,9,10] # coco category [person, bicycle, car]
+target_class=[1,2,3,4,5,6,7,8,9,10] # coco category [person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light]
 
 # train dataloader
 transform = transforms.Compose([
@@ -183,7 +185,7 @@ train_data_loader=DataLoader(dataset=train_dataset, shuffle=True,
 residual_model=ResidualClassification(input_channel=3, out_dim=max(target_class))
 residual_model=residual_model.to(device)
 
-optimizer=torch.optim.Adam(residual_model.parameters(),lr=0.001,weight_decay=0.0001)
+optimizer=torch.optim.Adam(residual_model.parameters(),lr=lr,weight_decay=weight_decay)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_step_size, gamma=0.1)
 criterion=ResidualLoss()
 
