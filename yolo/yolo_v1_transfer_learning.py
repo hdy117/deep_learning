@@ -13,18 +13,23 @@ sys.path.append(os.path.join(g_file_path,".."))
 
 from dataset import coco_dataset
 from yolo_v1 import *
+import residual_classification
 
 # 4.0 model define
 class YOLO_V1_Transfer(nn.Module):
     def __init__(self,input_channel=3, img_size=(HyperParam.IMG_SIZE,HyperParam.IMG_SIZE)):
         super().__init__()
         self.output_dim=HyperParam.OUT_DIM
-        self.vgg = models.vgg16(pretrained=True)
-        self.vgg_features = self.vgg.features
+        # self.vgg = models.vgg16(pretrained=True)
+        # self.vgg_features = self.vgg.features
+        self.residual=residual_classification.ResidualClassification(input_channel=3,out_dim=90)
+        self.residual.load_state_dict(torch.load(residual_classification.model_path))
+        self.residual.eval()
+        self.residual_feature=self.residual.features
 
         # 全连接层
         self.fc = nn.Sequential(
-            nn.Linear(512*7*7, 4096),
+            nn.Linear(256*14*14, 4096),
             nn.BatchNorm1d(4096),
             nn.LeakyReLU(),
             nn.Linear(4096, 4096),
@@ -35,23 +40,14 @@ class YOLO_V1_Transfer(nn.Module):
         )
 
     def forward(self,img):
-        out= x = self.vgg_features(img)
-        out=out.view(-1,512*7*7)
+        out= x = self.residual_feature(img)
+        out=out.view(-1,256*14*14)
         out=self.fc(out)
         out=out.view(-1,HyperParam.S,HyperParam.S,HyperParam.OUT_DIM)
 
         pred_class=out[...,:HyperParam.NUM_CLASS]
         pred_coord=out[...,HyperParam.NUM_CLASS:HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]
         pred_conf=out[...,HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]
-
-        # confidence_sigmoid=nn.Sigmoid()
-        # pred_conf=confidence_sigmoid(pred_conf)
-
-        # class_sigmoid=nn.Sigmoid()
-        # pred_class=class_sigmoid(pred_class)
-
-        # coord_sigmoid=nn.Sigmoid()
-        # pred_coord=coord_sigmoid(pred_coord)
 
         return pred_class, pred_coord, pred_conf
     
@@ -67,7 +63,7 @@ yolo_v1_transfer=yolo_v1_transfer.to(HyperParam.device)
 HyperParam.model_path=os.path.join(g_file_path, 'yolo_v1_transfer.pth')
 
 # 冻结 VGG 模型的卷积层
-for param in yolo_v1_transfer.vgg_features.parameters():
+for param in yolo_v1_transfer.residual.parameters():
     param.requires_grad = False
 
 # optimizer

@@ -75,7 +75,7 @@ class ResConv2dBlock(nn.Module):
 
         # a bottle neck 
         self.bottle_neck=nn.Sequential(
-            nn.BatchNorm2d(in_channels),
+            nn.BatchNorm2d(self.in_channels),
             nn.LeakyReLU(),
             nn.Conv2d(in_channels=self.in_channels,out_channels=self.out_channels//2,kernel_size=1),
             nn.BatchNorm2d(self.out_channels//2),
@@ -95,9 +95,35 @@ class ResConv2dBlock(nn.Module):
         out=bottle_neck+shortcut
 
         # avg pool 2d
-        avg_pool2d=nn.AvgPool2d(2,2)
-        out=avg_pool2d(out)
+        pool2d=nn.MaxPool2d(2,2)
+        out=pool2d(out)
 
+        return out
+
+class ResidualFeatures(nn.Module):
+    def __init__(self,input_channel=3, out_dim=1):
+        super().__init__()
+        self.output_dim=out_dim
+        # conv1
+        self.conv1=ResConv2dBlock(in_channels=3,out_channels=32) # (32,112,112)
+        # conv2
+        self.conv2=ResConv2dBlock(in_channels=32,out_channels=64) # (64,56,56)
+        # conv3
+        self.conv3=ResConv2dBlock(in_channels=64,out_channels=128) # (128,28,28)
+        # conv4
+        self.conv4=ResConv2dBlock(in_channels=128,out_channels=256) # (256,14,14)
+        # conv5
+        self.conv5=ResConv2dBlock(in_channels=256,out_channels=512) # (512,7,7)
+    
+    def forward(self,x):
+        '''
+        residual conv2d feature, output is [batch_size, 512, 7, 7]
+        '''
+        out=self.conv1(x)
+        out=self.conv2(out)
+        out=self.conv3(out)
+        out=self.conv4(out)
+        out=self.conv5(out)
         return out
 
 # residual classification
@@ -105,41 +131,21 @@ class ResidualClassification(nn.Module):
     def __init__(self,input_channel=3, out_dim=1):
         super().__init__()
         self.output_dim=out_dim
-        # conv0
-        self.conv0=nn.Sequential(
-            nn.Conv2d(in_channels=input_channel,out_channels=8,kernel_size=3,padding=1),
-        )
-        # conv1
-        self.conv1=ResConv2dBlock(in_channels=8,out_channels=32) # (32,112,112)
-        # conv2
-        self.conv2=ResConv2dBlock(in_channels=32,out_channels=64) # (64,56,56)
-        # conv3
-        self.conv3=ResConv2dBlock(in_channels=64,out_channels=128) # (128,28,28)
-        # conv4
-        self.conv4=ResConv2dBlock(in_channels=128,out_channels=256) # (256,14,14)
+        # feature extractor
+        self.features=ResidualFeatures(input_channel=input_channel, out_dim=out_dim)
+
         # fc
         self.fc = nn.Sequential(
-            nn.Linear(256*14*14, 4096),
+            nn.Linear(512*7*7, 4096),
             nn.BatchNorm1d(4096),
             nn.LeakyReLU(),
             nn.Linear(4096, self.output_dim),
             # nn.Sigmoid()
         )
 
-    def features(self,x):
-        '''
-        residual conv2d feature, output is [batch_size, 256, 14, 14]
-        '''
-        out=self.conv0(x)
-        out=self.conv1(out)
-        out=self.conv2(out)
-        out=self.conv3(out)
-        out=self.conv4(out)
-        return out
-
     def forward(self,img):
         out=self.features(img)
-        out=out.view(-1,256*14*14)
+        out=out.view(-1,512*7*7)
         out=self.fc(out)
         return out
 

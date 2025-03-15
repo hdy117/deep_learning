@@ -4,6 +4,7 @@ from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
 import os,sys
 import matplotlib.pyplot as plt
+import numpy as np
 
 # file_path
 g_file_path=os.path.dirname(os.path.abspath(__file__))
@@ -38,7 +39,7 @@ def test():
     total_correct = 0
     total_precision = 0
     total_recall = 0
-    conf_thresh = 0.5  # Adjust threshold if needed
+    conf_thresh = 0.6  # Adjust threshold if needed
 
     with torch.no_grad():
         print('================ Test ==================')
