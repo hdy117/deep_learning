@@ -81,17 +81,15 @@ class ResConv2dBlock(nn.Module):
             nn.Conv2d(in_channels=self.out_channels//2,out_channels=self.out_channels//2,kernel_size=kernel_size,padding=kernel_size//2),
             nn.BatchNorm2d(self.out_channels//2),
             nn.LeakyReLU(),
-            nn.Conv2d(in_channels=self.out_channels//2,out_channels=self.out_channels,kernel_size=1)
+            nn.Conv2d(in_channels=self.out_channels//2,out_channels=self.out_channels,kernel_size=1),
+            nn.BatchNorm2d(self.out_channels)
         )
 
         # shortcut
         self.shotcut=nn.Conv2d(in_channels=self.in_channels, out_channels=self.out_channels,kernel_size=1)
 
         # output layer
-        self.out_layer=nn.Sequential(
-            nn.BatchNorm2d(self.out_channels),
-            nn.LeakyReLU()
-        )
+        self.out_layer=nn.LeakyReLU()
 
     def forward(self, x):
         # bottle neck
