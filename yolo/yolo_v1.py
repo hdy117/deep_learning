@@ -31,8 +31,8 @@ class HyperParam:
     BBOX_SIZE=int(4)
     CONFIDENT_SIZE=int(1) 
     # NUM_CLASS=int(90)
-    NUM_CLASS=int(1)
-    TARGET_CLASS_LABELS=[3] # 3 mean car
+    NUM_CLASS=int(3)
+    TARGET_CLASS_LABELS=[1,2,3] # [person,bicycle,car]
     OUT_DIM=int(NUM_CLASS+BBOX_SIZE+CONFIDENT_SIZE) # output dim, NUM_CLASS+BBOX_SIZE+CONFIDENT_SIZE
 
 # 1. prepare dataset
@@ -90,7 +90,7 @@ class COCODataset(Dataset):
                 print(f'grid_i:{grid_i},grid_j:{grid_j},x:{x},y:{y},grid_size:{HyperParam.GRID_SIZE}')
                 continue
             labels[grid_i,grid_j,0:HyperParam.NUM_CLASS]=torch.zeros(HyperParam.NUM_CLASS) # clear class
-            labels[grid_i,grid_j,0]=1.0 # since there is only 1 class
+            labels[grid_i,grid_j,category_id-1]=1.0 # set proper class/category id
 
             # normalize x,y,w,h
             x=(x-grid_i*HyperParam.GRID_SIZE)/HyperParam.GRID_SIZE
