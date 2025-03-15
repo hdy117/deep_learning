@@ -59,6 +59,7 @@ class COCODataset(Dataset):
 
         if self.transform:
             img_pil=self.transform(img_pil)
+        img_pil=img_pil/255.0
         
         # print img
         # print(f'img_pil:{img_pil.mean()}')
@@ -123,7 +124,7 @@ class ResidualClassification(nn.Module):
             nn.BatchNorm1d(4096),
             nn.LeakyReLU(),
             nn.Linear(4096, self.output_dim),
-            nn.Sigmoid()
+            # nn.Sigmoid()
         )
 
     def features(self,x):
@@ -147,7 +148,7 @@ class ResidualClassification(nn.Module):
 class ResidualLoss(nn.Module):
     def __init__(self):
         super().__init__()
-        self.loss=nn.BCELoss(reduction='sum')
+        self.loss=nn.BCEWithLogitsLoss(reduction='sum')
     
     def forward(self,y_pred,label):
         loss=self.loss(y_pred,label)
@@ -156,25 +157,26 @@ class ResidualLoss(nn.Module):
 # hyper param
 device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_path=os.path.join(g_file_path,"residual_classification.pth")
-batch_size=64
+batch_size=128
 n_epoch=30
 lr=0.001
 weight_decay=0.0001
 lr_step_size=n_epoch//3
 img_new_size=224
-target_class=[1,2,3,4,5,6,7,8,9,10] # coco category [person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light]
+# target_class=[1,2,3,4,5,6,7,8,9,10] # coco category [person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light]
+target_class=[val for val in range(1,91)] # coco category [person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light]
 
 # train dataloader
 transform = transforms.Compose([
     # 将 PIL 图像转换为 PyTorch 张量
-    transforms.ToTensor(),
+    transforms.ToTensor()
     # 对图像进行归一化处理
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
 # train dataloader
 train_dataset=COCODataset(coco_dataset.coco_train_img_dir,
-                          coco_dataset.coco_train_sub_annotation_file,
+                          coco_dataset.coco_train_annotation_file,
                           img_new_size=img_new_size,
                           target_class=target_class,
                           transform=transform)

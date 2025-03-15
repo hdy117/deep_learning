@@ -13,7 +13,7 @@ from residual_classification import *
 
 # test dataloader
 val_dataset=COCODataset(coco_dataset.coco_val_img_dir,
-                        coco_dataset.coco_val_sub_annotation_file,
+                        coco_dataset.coco_val_annotation_file,
                         img_new_size=img_new_size,
                         target_class=target_class,
                         transform=transform)
@@ -39,6 +39,7 @@ def test():
         n_total=0
         n_correct=0
         conf_thresh=0.9
+        sigmoid=nn.Sigmoid()
         for batch_idx,(samples, labels) in enumerate(val_data_loader):
             # data to device
             samples=samples.to(device)
@@ -46,6 +47,7 @@ def test():
 
             # predict
             y_pred=model.forward(samples)
+            y_pred=sigmoid(y_pred)
 
             # size
             batch_size=y_pred.shape[0]
