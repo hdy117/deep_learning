@@ -75,8 +75,6 @@ class ResConv2dBlock(nn.Module):
 
         # a bottle neck 
         self.bottle_neck=nn.Sequential(
-            nn.BatchNorm2d(self.in_channels),
-            nn.LeakyReLU(),
             nn.Conv2d(in_channels=self.in_channels,out_channels=self.out_channels//2,kernel_size=1),
             nn.BatchNorm2d(self.out_channels//2),
             nn.LeakyReLU(),
@@ -86,15 +84,25 @@ class ResConv2dBlock(nn.Module):
             nn.Conv2d(in_channels=self.out_channels//2,out_channels=self.out_channels,kernel_size=1)
         )
 
+        # shortcut
         self.shotcut=nn.Conv2d(in_channels=self.in_channels, out_channels=self.out_channels,kernel_size=1)
 
-    def forward(self, x):
-        # residual bottle neck
-        bottle_neck=self.bottle_neck(x)
-        shortcut=self.shotcut(x)
-        out=bottle_neck+shortcut
+        # output layer
+        self.out_layer=nn.Sequential(
+            nn.BatchNorm2d(self.out_channels),
+            nn.LeakyReLU()
+        )
 
-        # avg pool 2d
+    def forward(self, x):
+        # bottle neck
+        bottle_neck=self.bottle_neck(x)
+        # shortcut
+        shortcut=self.shotcut(x)
+        # residual
+        out=bottle_neck+shortcut
+        # out layer
+        out=self.out_layer(out)
+        # pool 2d
         pool2d=nn.MaxPool2d(2,2)
         out=pool2d(out)
 
@@ -139,8 +147,10 @@ class ResidualClassification(nn.Module):
             nn.Linear(512*7*7, 4096),
             nn.BatchNorm1d(4096),
             nn.LeakyReLU(),
+            nn.Linear(4096, 4096),
+            nn.BatchNorm1d(4096),
+            nn.LeakyReLU(),
             nn.Linear(4096, self.output_dim),
-            # nn.Sigmoid()
         )
 
     def forward(self,img):
@@ -163,7 +173,7 @@ class ResidualLoss(nn.Module):
 device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_path=os.path.join(g_file_path,"residual_classification.pth")
 batch_size=128
-n_epoch=30
+n_epoch=120
 lr=0.001
 weight_decay=0.0001
 lr_step_size=n_epoch//3

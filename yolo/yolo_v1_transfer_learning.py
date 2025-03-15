@@ -29,7 +29,7 @@ class YOLO_V1_Transfer(nn.Module):
 
         # 全连接层
         self.fc = nn.Sequential(
-            nn.Linear(256*14*14, 4096),
+            nn.Linear(512*7*7, 4096),
             nn.BatchNorm1d(4096),
             nn.LeakyReLU(),
             nn.Linear(4096, 4096),
@@ -41,7 +41,7 @@ class YOLO_V1_Transfer(nn.Module):
 
     def forward(self,img):
         out= x = self.residual_feature(img)
-        out=out.view(-1,256*14*14)
+        out=out.view(-1,512*7*7)
         out=self.fc(out)
         out=out.view(-1,HyperParam.S,HyperParam.S,HyperParam.OUT_DIM)
 
@@ -68,7 +68,7 @@ for param in yolo_v1_transfer.residual.features.parameters():
 
 # optimizer
 optimizer=torch.optim.Adam(yolo_v1_transfer.parameters(),lr=HyperParam.learning_rate,weight_decay=HyperParam.weight_decay)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=HyperParam.lr_step_size, gamma=0.1)
 criterion=YOLO_V1_Loss()
 
 def train():

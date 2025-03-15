@@ -18,6 +18,7 @@ from dataset import coco_dataset
 class HyperParam:
     batch_size=64
     n_epoch=90
+    lr_step_size=n_epoch//3
     learning_rate=0.001
     weight_decay=0.0001
     device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
