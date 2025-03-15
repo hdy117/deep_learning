@@ -33,41 +33,60 @@ def test():
         except Exception as e:
             print(f'Error loading model: {e}')
 
-    # testing
+    # Evaluation metrics
+    total_samples = 0
+    total_correct = 0
+    total_precision = 0
+    total_recall = 0
+    conf_thresh = 0.5  # Adjust threshold if needed
+
     with torch.no_grad():
-        print('================test==================')
-        n_total=0
-        n_correct=0
-        conf_thresh=0.9
-        for batch_idx,(samples, labels) in enumerate(val_data_loader):
-            # data to device
-            samples=samples.to(device)
-            labels=labels.to(device)
+        print('================ Test ==================')
+        for batch_idx, (samples, labels) in enumerate(val_data_loader):
+            # Move data to device
+            samples = samples.to(device)
+            labels = labels.to(device)
 
-            # predict
-            y_pred=model.forward(samples)
-            y_pred=nn.Sigmoid(y_pred)
+            # Predict
+            y_pred = model(samples).sigmoid()  # Apply sigmoid activation
 
-            # size
-            batch_size=y_pred.shape[0]
-            out_dim=y_pred.shape[1]
+            # Convert predictions to binary (0 or 1)
+            y_pred_bin = (y_pred > conf_thresh).float()
 
-            # calculate correction
-            y_pred_obj=(y_pred>conf_thresh).float()
-            correct_per_sample=(y_pred_obj==labels).sum().item()
+            # Calculate batch metrics
+            batch_correct = (y_pred_bin == labels).sum().item()
+            batch_total = labels.numel()
 
-            # print something
-            for batch in range(batch_size):
-                label_list = [f'{val:.2f}' for val in labels[batch].tolist()]
-                pred_list = [f'{val:.2f}' for val in y_pred[batch].tolist()]
-                print(f'label: {label_list}, pred: {pred_list}')
+            # Precision and recall calculations
+            true_positives = (y_pred_bin * labels).sum(dim=0).cpu().numpy()
+            predicted_positives = y_pred_bin.sum(dim=0).cpu().numpy()
+            actual_positives = labels.sum(dim=0).cpu().numpy()
 
-            # accuracy
-            n_correct += correct_per_sample
-            n_total += out_dim * batch_size
+            # Avoid division by zero
+            precision = np.divide(true_positives, predicted_positives, out=np.zeros_like(true_positives), where=predicted_positives > 0)
+            recall = np.divide(true_positives, actual_positives, out=np.zeros_like(true_positives), where=actual_positives > 0)
 
-        # for multiple class
-        print(f'test accuracy:{n_correct/n_total}, n_correct:{n_correct}, n_total:{n_total}')
+            # Aggregate results
+            total_correct += batch_correct
+            total_samples += batch_total
+            total_precision += precision.mean()
+            total_recall += recall.mean()
+
+            # Print sample predictions
+            if batch_idx % 10 == 0:
+                for batch in range(min(3, samples.shape[0])):  # Show up to 3 samples
+                    label_list = [f'{int(val)}' for val in labels[batch].tolist()]
+                    pred_list = [f'{int(val)}' for val in y_pred_bin[batch].tolist()]
+                    print(f'Label: {label_list}, Pred: {pred_list}')
+
+        # Final Metrics
+        accuracy = total_correct / total_samples
+        avg_precision = total_precision / len(val_data_loader)
+        avg_recall = total_recall / len(val_data_loader)
+
+        print(f'Test Accuracy: {accuracy:.4f}')
+        print(f'Test Precision: {avg_precision:.4f}')
+        print(f'Test Recall: {avg_recall:.4f}')
 
 # main
 if __name__=="__main__":
