@@ -147,9 +147,11 @@ class ResidualClassification(nn.Module):
             nn.Linear(512*7*7, 4096),
             nn.BatchNorm1d(4096),
             nn.LeakyReLU(),
+            nn.Dropout(0.5),
             nn.Linear(4096, 4096),
             nn.BatchNorm1d(4096),
             nn.LeakyReLU(),
+            nn.Dropout(0.5),
             nn.Linear(4096, self.output_dim),
         )
 
