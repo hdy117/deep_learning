@@ -83,17 +83,16 @@ class ResConv2dBlock(nn.Module):
             nn.Conv2d(in_channels=self.out_channels//2,out_channels=self.out_channels//2,kernel_size=kernel_size,padding=kernel_size//2),
             nn.BatchNorm2d(self.out_channels//2),
             nn.LeakyReLU(),
-            nn.Conv2d(in_channels=self.out_channels//2,out_channels=self.out_channels-self.in_channels,kernel_size=1)
+            nn.Conv2d(in_channels=self.out_channels//2,out_channels=self.out_channels,kernel_size=1)
         )
 
-        # self.residual=nn.Conv2d(in_channels=self.in_channels, out_channels=self.in_channels,kernel_size=1)
+        self.shotcut=nn.Conv2d(in_channels=self.in_channels, out_channels=self.out_channels,kernel_size=1)
 
     def forward(self, x):
         # residual bottle neck
         bottle_neck=self.bottle_neck(x)
-        # residual=self.residual(x)
-        # out=torch.concat([bottle_neck,residual],dim=1)
-        out=torch.concat([bottle_neck,x],dim=1)
+        shortcut=self.shotcut(x)
+        out=bottle_neck+shortcut
 
         # avg pool 2d
         avg_pool2d=nn.AvgPool2d(2,2)
