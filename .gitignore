@@ -21,3 +21,4 @@ __pycache__
 *.pth
 test
 bbox_test
+test_*
