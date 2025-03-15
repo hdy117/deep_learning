@@ -39,7 +39,6 @@ def test():
         n_total=0
         n_correct=0
         conf_thresh=0.9
-        sigmoid=nn.Sigmoid()
         for batch_idx,(samples, labels) in enumerate(val_data_loader):
             # data to device
             samples=samples.to(device)
@@ -47,7 +46,7 @@ def test():
 
             # predict
             y_pred=model.forward(samples)
-            y_pred=sigmoid(y_pred)
+            y_pred=nn.Sigmoid(y_pred)
 
             # size
             batch_size=y_pred.shape[0]
