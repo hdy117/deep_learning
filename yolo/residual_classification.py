@@ -68,41 +68,35 @@ class COCODataset(Dataset):
 
 # residual block
 class ResConv2dBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3):
+    def __init__(self, in_channels, out_channels, kernel_size=7):
         super().__init__()
         self.in_channels=in_channels
         self.out_channels=out_channels
 
-        # a bottle neck 
-        self.bottle_neck=nn.Sequential(
-            nn.Conv2d(in_channels=self.in_channels,out_channels=self.out_channels//2,kernel_size=1),
-            nn.BatchNorm2d(self.out_channels//2),
-            nn.LeakyReLU(),
-            nn.Conv2d(in_channels=self.out_channels//2,out_channels=self.out_channels//2,kernel_size=kernel_size,padding=kernel_size//2),
-            nn.BatchNorm2d(self.out_channels//2),
-            nn.LeakyReLU(),
-            nn.Conv2d(in_channels=self.out_channels//2,out_channels=self.out_channels,kernel_size=1),
-            nn.BatchNorm2d(self.out_channels)
+        # a conv layer
+        self.conv_layer=nn.Sequential(
+            nn.BatchNorm2d(self.in_channels),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=self.in_channels,out_channels=self.out_channels,kernel_size=1),
+            nn.BatchNorm2d(self.out_channels),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=self.out_channels,out_channels=self.out_channels,kernel_size=kernel_size,padding=kernel_size//2),
+            nn.BatchNorm2d(self.out_channels),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=self.out_channels,out_channels=self.out_channels,kernel_size=1),
         )
 
         # shortcut
-        self.shotcut=nn.Conv2d(in_channels=self.in_channels, out_channels=self.out_channels,kernel_size=1)
-
-        # output layer
-        self.out_layer=nn.LeakyReLU()
+        self.shotcut=(nn.Conv2d(in_channels=self.in_channels, out_channels=self.out_channels,kernel_size=1) \
+            if self.in_channels!=self.out_channels else nn.Identity())
 
     def forward(self, x):
-        # bottle neck
-        bottle_neck=self.bottle_neck(x)
+        # conv layer
+        conv_layer=self.conv_layer(x)
         # shortcut
         shortcut=self.shotcut(x)
         # residual
-        out=bottle_neck+shortcut
-        # out layer
-        out=self.out_layer(out)
-        # pool 2d
-        pool2d=nn.MaxPool2d(2,2)
-        out=pool2d(out)
+        out=conv_layer+shortcut
 
         return out
 
@@ -120,16 +114,25 @@ class ResidualFeatures(nn.Module):
         self.conv4=ResConv2dBlock(in_channels=128,out_channels=256) # (256,14,14)
         # conv5
         self.conv5=ResConv2dBlock(in_channels=256,out_channels=512) # (512,7,7)
+
+        self.feature_representation=nn.Sequential(
+            nn.Conv2d(in_channels=input_channel, out_channels=64, kernel_size=7, padding=7//2), 
+            nn.MaxPool2d(2,2),  # (64,112,112)
+            ResConv2dBlock(in_channels=64,out_channels=128,kernel_size=7),      
+            nn.MaxPool2d(2,2),  # (128,56,56)
+            ResConv2dBlock(in_channels=128,out_channels=256,kernel_size=7),     
+            nn.MaxPool2d(2,2),  # (256,28,28)
+            ResConv2dBlock(in_channels=256,out_channels=512,kernel_size=7),    
+            nn.MaxPool2d(2,2),  # (512,14,14)
+            ResConv2dBlock(in_channels=512,out_channels=1024,kernel_size=7),   
+            nn.MaxPool2d(2,2),  # (1024,7,7)
+        )
     
     def forward(self,x):
         '''
-        residual conv2d feature, output is [batch_size, 512, 7, 7]
+        residual conv2d feature, output is [batch_size, 2048, 7, 7]
         '''
-        out=self.conv1(x)
-        out=self.conv2(out)
-        out=self.conv3(out)
-        out=self.conv4(out)
-        out=self.conv5(out)
+        out=self.feature_representation(x)
         return out
 
 # residual classification
@@ -142,20 +145,20 @@ class ResidualClassification(nn.Module):
 
         # fc
         self.fc = nn.Sequential(
-            nn.Linear(512*7*7, 4096),
+            nn.Linear(1024*7*7, 4096),
             nn.BatchNorm1d(4096),
-            nn.LeakyReLU(),
+            nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(4096, 4096),
             nn.BatchNorm1d(4096),
-            nn.LeakyReLU(),
+            nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(4096, self.output_dim),
         )
 
     def forward(self,img):
         out=self.features(img)
-        out=out.view(-1,512*7*7)
+        out=out.view(-1,1024*7*7)
         out=self.fc(out)
         return out
 
@@ -172,8 +175,8 @@ class ResidualLoss(nn.Module):
 # hyper param
 device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_path=os.path.join(g_file_path,"residual_classification.pth")
-batch_size=128
-n_epoch=120
+batch_size=64
+n_epoch=60
 lr=0.001
 weight_decay=0.0001
 lr_step_size=n_epoch//3
