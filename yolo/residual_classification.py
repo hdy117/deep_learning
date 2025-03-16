@@ -121,7 +121,7 @@ class ResidualFeatures(nn.Module):
     
     def forward(self,x):
         '''
-        residual conv2d feature, output is [batch_size, 2048, 7, 7]
+        residual conv2d feature, output is [batch_size, 1024, 7, 7]
         '''
         out=self.feature_representation(x)
         return out
