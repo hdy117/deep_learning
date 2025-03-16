@@ -5,13 +5,13 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision.transforms import transforms
 import os,sys
 import numpy as np
-import math
 
 # file_path
 g_file_path=os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(g_file_path,".."))
 
 from dataset import coco_dataset
+from dataset import image_cdf
 
 
 # 0. hyper param
@@ -105,13 +105,12 @@ class COCODataset(Dataset):
             labels[grid_i,grid_j,HyperParam.NUM_CLASS+HyperParam.BBOX_SIZE]=confidence
 
         # convert pil image to torch tensor
-        img_data:np.ndarray=np.array(img_pil)
-        img_data:torch.Tensor=torch.from_numpy(img_data).float()
-        img_data=img_data.permute(2,0,1) # channel, width, height
-        img_data=img_data/255.0 # normalize
+        img_data=img_pil
 
         if self.transform:
             img_data=self.transform(img_data)
+            img_data=image_cdf.apply_cdf_to_channels(img_data)
+
         return img_data, labels
 
 # 4.0 model define

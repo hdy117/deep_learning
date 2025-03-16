@@ -54,8 +54,14 @@ class YOLO_V1_Transfer(nn.Module):
         return pred_class, pred_coord, pred_conf
     
 # train dataloader
-train_dataset=COCODataset(coco_dataset.coco_train_img_dir,coco_dataset.coco_train_sub_annotation_file)
-train_data_loader=DataLoader(dataset=train_dataset, shuffle=True, batch_size=HyperParam.batch_size)
+transform=transforms.Compose([transforms.ToTensor()])
+train_dataset=COCODataset(coco_dataset.coco_train_img_dir,
+                          coco_dataset.coco_train_sub_annotation_file,
+                          img_new_size=HyperParam.IMG_SIZE,
+                          transform=transform)
+train_data_loader=DataLoader(dataset=train_dataset, 
+                             shuffle=True,
+                             batch_size=HyperParam.batch_size)
 
 # train
 yolo_v1_transfer=YOLO_V1_Transfer()

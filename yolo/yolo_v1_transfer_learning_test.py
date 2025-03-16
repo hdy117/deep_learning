@@ -7,11 +7,17 @@ from yolo_v1_transfer_learning import *
 g_file_path=os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(g_file_path,"..","dataset"))
 
-import bbox_utils
+from dataset import bbox_utils
 
 # test dataloader
-val_dataset=COCODataset(coco_dataset.coco_val_img_dir,coco_dataset.coco_val_sub_annotation_file)
-val_data_loader=DataLoader(dataset=val_dataset, shuffle=True, batch_size=HyperParam.batch_size)
+transform=transforms.Compose([transforms.ToTensor()])
+val_dataset=COCODataset(coco_dataset.coco_val_img_dir,
+                        coco_dataset.coco_val_sub_annotation_file,
+                        img_new_size=HyperParam.IMG_SIZE,
+                        transform=transform)
+val_data_loader=DataLoader(dataset=val_dataset, 
+                           shuffle=False, 
+                           batch_size=HyperParam.batch_size)
 
 # test
 yolo_v1=YOLO_V1_Transfer()
