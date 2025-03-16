@@ -15,6 +15,7 @@ dataset/*
 !dataset/coco_subset.py
 !dataset/coco_subset.py
 !dataset/bbox_utils.py
+!dataset/*.py
 ref/*
 __pycache__
 *.pyc
