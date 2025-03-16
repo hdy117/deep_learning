@@ -77,13 +77,13 @@ class ResConv2dBlock(nn.Module):
         # a conv layer
         self.conv_layer=nn.Sequential(
             nn.BatchNorm2d(self.in_channels),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Conv2d(in_channels=self.in_channels,out_channels=self.out_channels,kernel_size=1),
             nn.BatchNorm2d(self.out_channels),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Conv2d(in_channels=self.out_channels,out_channels=self.out_channels,kernel_size=kernel_size,padding=kernel_size//2),
             nn.BatchNorm2d(self.out_channels),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Conv2d(in_channels=self.out_channels,out_channels=self.out_channels,kernel_size=1),
         )
 
@@ -107,7 +107,7 @@ class ResidualFeatures(nn.Module):
         self.feature_representation=nn.Sequential(
             nn.Conv2d(in_channels=input_channel, out_channels=64, kernel_size=7, padding=7//2), 
             nn.BatchNorm2d(64),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.MaxPool2d(2,2),  # (64,112,112)
             ResConv2dBlock(in_channels=64,out_channels=128,kernel_size=7),      
             nn.MaxPool2d(2,2),  # (128,56,56)
@@ -137,14 +137,14 @@ class ResidualClassification(nn.Module):
         # fc
         self.fc = nn.Sequential(
             nn.BatchNorm1d(1024*7*7),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(1024*7*7, 2048),
             nn.BatchNorm1d(2048),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Dropout(0.5),
             nn.Linear(2048, 2048),
             nn.BatchNorm1d(2048),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Dropout(0.5),
             nn.Linear(2048, self.output_dim),
         )
