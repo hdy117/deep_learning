@@ -103,18 +103,6 @@ class ResConv2dBlock(nn.Module):
 class ResidualFeatures(nn.Module):
     def __init__(self,input_channel=3, out_dim=1):
         super().__init__()
-        self.output_dim=out_dim
-        # conv1
-        self.conv1=ResConv2dBlock(in_channels=3,out_channels=32) # (32,112,112)
-        # conv2
-        self.conv2=ResConv2dBlock(in_channels=32,out_channels=64) # (64,56,56)
-        # conv3
-        self.conv3=ResConv2dBlock(in_channels=64,out_channels=128) # (128,28,28)
-        # conv4
-        self.conv4=ResConv2dBlock(in_channels=128,out_channels=256) # (256,14,14)
-        # conv5
-        self.conv5=ResConv2dBlock(in_channels=256,out_channels=512) # (512,7,7)
-
         self.feature_representation=nn.Sequential(
             nn.Conv2d(in_channels=input_channel, out_channels=64, kernel_size=7, padding=7//2), 
             nn.MaxPool2d(2,2),  # (64,112,112)
