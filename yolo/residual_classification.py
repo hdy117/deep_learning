@@ -101,7 +101,7 @@ class ResConv2dBlock(nn.Module):
         return out
 
 class ResidualFeatures(nn.Module):
-    def __init__(self,input_channel=3, out_dim=1):
+    def __init__(self,input_channel=3):
         super().__init__()
         self.feature_representation=nn.Sequential(
             nn.Conv2d(in_channels=input_channel, out_channels=64, kernel_size=7, padding=7//2), 
@@ -114,8 +114,8 @@ class ResidualFeatures(nn.Module):
             nn.MaxPool2d(2,2),  # (512,14,14)
             ResConv2dBlock(in_channels=512,out_channels=1024,kernel_size=7),   
             nn.MaxPool2d(2,2),  # (1024,7,7)
-            # nn.BatchNorm1d(1024*7*7),
-            # nn.ReLU(),
+            nn.BatchNorm1d(1024*7*7),
+            nn.ReLU(),
         )
     
     def forward(self,x):
@@ -131,12 +131,10 @@ class ResidualClassification(nn.Module):
         super().__init__()
         self.output_dim=out_dim
         # feature extractor
-        self.features=ResidualFeatures(input_channel=input_channel, out_dim=out_dim)
+        self.features=ResidualFeatures(input_channel=input_channel)
 
         # fc
         self.fc = nn.Sequential(
-            nn.BatchNorm1d(1024*7*7),
-            nn.ReLU(),
             nn.Linear(1024*7*7, 4096),
             nn.BatchNorm1d(4096),
             nn.ReLU(),
