@@ -106,6 +106,8 @@ class ResidualFeatures(nn.Module):
         super().__init__()
         self.feature_representation=nn.Sequential(
             nn.Conv2d(in_channels=input_channel, out_channels=64, kernel_size=7, padding=7//2), 
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
             nn.MaxPool2d(2,2),  # (64,112,112)
             ResConv2dBlock(in_channels=64,out_channels=128,kernel_size=7),      
             nn.MaxPool2d(2,2),  # (128,56,56)
