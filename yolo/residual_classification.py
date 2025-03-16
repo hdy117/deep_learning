@@ -10,6 +10,7 @@ g_file_path=os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(g_file_path,".."))
 
 from dataset import coco_dataset
+from dataset import image_cdf
 
 # coco dataset
 class COCODataset(Dataset):
@@ -59,7 +60,7 @@ class COCODataset(Dataset):
 
         if self.transform:
             img_pil=self.transform(img_pil)
-        img_pil=img_pil/255.0
+            img_pil=image_cdf.apply_cdf_to_channels(img_pil)
         
         # print img
         # print(f'img_pil:{img_pil.mean()}')

@@ -58,3 +58,5 @@ if __name__ == "__main__":
 
     # show
     img_pil.show()
+
+    print(f'{img_tensor_cdf}')
