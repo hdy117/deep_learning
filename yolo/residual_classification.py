@@ -88,14 +88,14 @@ class ResConv2dBlock(nn.Module):
         )
 
         # shortcut
-        self.shotcut=(nn.Conv2d(in_channels=self.in_channels, out_channels=self.out_channels,kernel_size=1) \
+        self.shortcut=(nn.Conv2d(in_channels=self.in_channels, out_channels=self.out_channels,kernel_size=1) \
             if self.in_channels!=self.out_channels else nn.Identity())
 
     def forward(self, x):
         # conv layer
         conv_layer=self.conv_layer(x)
         # shortcut
-        shortcut=self.shotcut(x)
+        shortcut=self.shortcut(x)
         # residual
         out=conv_layer+shortcut
 
