@@ -17,7 +17,7 @@ from dataset import coco_dataset
 # 0. hyper param
 class HyperParam:
     batch_size=64
-    n_epoch=90
+    n_epoch=60
     lr_step_size=n_epoch//3
     learning_rate=0.001
     weight_decay=0.0001

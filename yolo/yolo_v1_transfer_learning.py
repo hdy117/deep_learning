@@ -29,19 +29,21 @@ class YOLO_V1_Transfer(nn.Module):
 
         # 全连接层
         self.fc = nn.Sequential(
-            nn.Linear(512*7*7, 4096),
-            nn.BatchNorm1d(4096),
+            nn.BatchNorm1d(1024*7*7),
+            nn.ReLU(),
+            nn.Linear(1024*7*7, 2048),
+            nn.BatchNorm1d(2048),
             nn.LeakyReLU(),
-            nn.Linear(4096, 4096),
-            nn.BatchNorm1d(4096),
+            nn.Linear(2048, 2048),
+            nn.BatchNorm1d(2048),
             nn.LeakyReLU(),
-            nn.Linear(4096, HyperParam.S*HyperParam.S*HyperParam.OUT_DIM),
+            nn.Linear(2048, HyperParam.S*HyperParam.S*HyperParam.OUT_DIM),
             nn.Sigmoid()
         )
 
     def forward(self,img):
         out= x = self.residual_feature(img)
-        out=out.view(-1,512*7*7)
+        out=out.view(-1,1024*7*7)
         out=self.fc(out)
         out=out.view(-1,HyperParam.S,HyperParam.S,HyperParam.OUT_DIM)
 
