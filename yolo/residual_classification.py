@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
-import os,sys
+import os,sys,time
 import matplotlib.pyplot as plt
 
 # file_path
@@ -207,6 +207,7 @@ def train():
     # training
     for epoch in range(n_epoch):
         print('================train==================')
+        t_start=time.time()
         for batch_idx,(samples, labels) in enumerate(train_data_loader):
             # data to device
             samples=samples.to(device)
@@ -234,6 +235,10 @@ def train():
 
         # save model
         torch.save(residual_model.state_dict(),model_path)
+
+        # end of time
+        t_end=time.time()
+        print(f'elapsed time for one epoch is {t_end-t_start}')
 
 # main
 if __name__=="__main__":
