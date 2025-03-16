@@ -22,7 +22,7 @@ class YOLO_V1_Transfer(nn.Module):
         self.output_dim=HyperParam.OUT_DIM
         # self.vgg = models.vgg16(pretrained=True)
         # self.vgg_features = self.vgg.features
-        self.residual=residual_classification.ResidualClassification(input_channel=3,out_dim=90)
+        self.residual=residual_classification.ResidualClassification(input_channel=3,out_dim=residual_classification.out_dim)
         self.residual.load_state_dict(torch.load(residual_classification.model_path))
         self.residual.eval()
         self.residual_feature=self.residual.features

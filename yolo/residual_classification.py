@@ -170,6 +170,7 @@ weight_decay=0.0001
 lr_step_size=n_epoch//3
 img_new_size=224
 target_class=[1,2,3,4,5,6,7,8,9,10] # coco category [person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light]
+out_dim=max(target_class)
 # target_class=[val for val in range(1,91)] # coco category [person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light]
 
 # train dataloader
@@ -190,7 +191,7 @@ train_data_loader=DataLoader(dataset=train_dataset, shuffle=True,
                              batch_size=batch_size)
 
 # train
-residual_model=ResidualClassification(input_channel=3, out_dim=max(target_class))
+residual_model=ResidualClassification(input_channel=3, out_dim=out_dim)
 residual_model=residual_model.to(device)
 
 optimizer=torch.optim.Adam(residual_model.parameters(),lr=lr,weight_decay=weight_decay)
