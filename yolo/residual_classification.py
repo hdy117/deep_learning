@@ -182,7 +182,7 @@ transform = transforms.Compose([
 
 # train dataloader
 train_dataset=COCODataset(coco_dataset.coco_train_img_dir,
-                          coco_dataset.coco_train_annotation_file,
+                          coco_dataset.coco_train_sub_annotation_file,
                           img_new_size=img_new_size,
                           target_class=target_class,
                           transform=transform)

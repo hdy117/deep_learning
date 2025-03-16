@@ -14,7 +14,7 @@ from residual_classification import *
 
 # test dataloader
 val_dataset=COCODataset(coco_dataset.coco_val_img_dir,
-                        coco_dataset.coco_val_annotation_file,
+                        coco_dataset.coco_val_sub_annotation_file,
                         img_new_size=img_new_size,
                         target_class=target_class,
                         transform=transform)
