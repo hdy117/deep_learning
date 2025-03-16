@@ -114,8 +114,6 @@ class ResidualFeatures(nn.Module):
             nn.MaxPool2d(2,2),  # (512,14,14)
             ResConv2dBlock(in_channels=512,out_channels=1024,kernel_size=7),   
             nn.MaxPool2d(2,2),  # (1024,7,7)
-            nn.BatchNorm1d(1024*7*7),
-            nn.ReLU(),
         )
     
     def forward(self,x):
@@ -135,15 +133,17 @@ class ResidualClassification(nn.Module):
 
         # fc
         self.fc = nn.Sequential(
-            nn.Linear(1024*7*7, 4096),
-            nn.BatchNorm1d(4096),
+            nn.BatchNorm1d(1024*7*7),
+            nn.ReLU(),
+            nn.Linear(1024*7*7, 2048),
+            nn.BatchNorm1d(2048),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(4096, 4096),
-            nn.BatchNorm1d(4096),
+            nn.Linear(2048, 2048),
+            nn.BatchNorm1d(2048),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(4096, self.output_dim),
+            nn.Linear(2048, self.output_dim),
         )
 
     def forward(self,img):
@@ -165,8 +165,8 @@ class ResidualLoss(nn.Module):
 # hyper param
 device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_path=os.path.join(g_file_path,"residual_classification.pth")
-batch_size=64
-n_epoch=9
+batch_size=32
+n_epoch=30
 lr=0.001
 weight_decay=0.0001
 lr_step_size=n_epoch//3

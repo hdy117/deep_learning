@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from torchvision.transforms import transforms
-import os,sys
+import os,sys,time
 import numpy as np
 import torchvision.models as models
 
@@ -29,6 +29,8 @@ class YOLO_V1_Transfer(nn.Module):
 
         # 全连接层
         self.fc = nn.Sequential(
+            nn.BatchNorm1d(1024*7*7),
+            nn.ReLU(),
             nn.Linear(1024*7*7, 2048),
             nn.BatchNorm1d(2048),
             nn.LeakyReLU(),
@@ -78,11 +80,10 @@ def train():
         yolo_v1_transfer.train()
         print(f'yolo v1 trained model loaded from {HyperParam.model_path}')
 
-    best_loss=1e12
-
     # training
     for epoch in range(HyperParam.n_epoch):
         print('================train==================')
+        t_start=time.time()
         for batch_idx,(samples, labels) in enumerate(train_data_loader):
             # data to device
             samples=samples.to(HyperParam.device)
@@ -115,6 +116,9 @@ def train():
 
         # save
         torch.save(yolo_v1_transfer.state_dict(),HyperParam.model_path)
+
+        t_end=time.time()
+        print(f'elapsed time for one batch {t_end-t_start}')
 
 if __name__=="__main__":
     train()
