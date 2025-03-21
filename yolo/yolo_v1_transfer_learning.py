@@ -42,7 +42,7 @@ class YOLO_V1_Transfer(nn.Module):
         )
 
     def forward(self,img):
-        out= x = self.residual_feature(img)
+        out=self.residual_feature(img)
         out=out.view(-1,1024*7*7)
         out=self.fc(out)
         out=out.view(-1,HyperParam.S,HyperParam.S,HyperParam.OUT_DIM)
