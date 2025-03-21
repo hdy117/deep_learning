@@ -77,20 +77,19 @@ class ResConv2dBlock(nn.Module):
 
         # a conv layer
         self.conv_layer=nn.Sequential(
-            nn.Conv2d(in_channels=self.in_channels,out_channels=self.out_channels//2,kernel_size=1),
-            nn.BatchNorm2d(self.out_channels//2),
-            nn.LeakyReLU(),
-            nn.Conv2d(in_channels=self.out_channels//2,out_channels=self.out_channels//2,kernel_size=kernel_size,padding=kernel_size//2),
-            nn.BatchNorm2d(self.out_channels//2),
-            nn.LeakyReLU(),
-            nn.Conv2d(in_channels=self.out_channels//2,out_channels=self.out_channels,kernel_size=1),
+            nn.Conv2d(in_channels=self.in_channels,out_channels=self.out_channels,kernel_size=kernel_size,padding=kernel_size//2),
             nn.BatchNorm2d(self.out_channels),
-            nn.LeakyReLU(),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(in_channels=self.out_channels,out_channels=self.out_channels,kernel_size=kernel_size,padding=kernel_size//2),
+            nn.BatchNorm2d(self.out_channels),
         )
 
         # shortcut
         self.shortcut=(nn.Conv2d(in_channels=self.in_channels, out_channels=self.out_channels,kernel_size=1) \
             if self.in_channels!=self.out_channels else nn.Identity())
+
+        # active
+        self.active=nn.LeakyReLU(inplace=True)
 
     def forward(self, x):
         # conv layer
@@ -99,6 +98,8 @@ class ResConv2dBlock(nn.Module):
         shortcut=self.shortcut(x)
         # residual
         out=conv_layer+shortcut
+        # active function
+        out=self.active(out)
 
         return out
 
@@ -108,16 +109,20 @@ class ResidualFeatures(nn.Module):
         self.feature_representation=nn.Sequential(
             nn.Conv2d(in_channels=input_channel, out_channels=64, kernel_size=3, padding=3//2), 
             nn.BatchNorm2d(64),
-            nn.LeakyReLU(),
+            nn.LeakyReLU(inplace=True),
             nn.MaxPool2d(2,2),  # (64,112,112)
+            ResConv2dBlock(in_channels=64,out_channels=64,kernel_size=3),      
             ResConv2dBlock(in_channels=64,out_channels=128,kernel_size=3),      
             nn.MaxPool2d(2,2),  # (128,56,56)
+            ResConv2dBlock(in_channels=128,out_channels=128,kernel_size=3),     
             ResConv2dBlock(in_channels=128,out_channels=256,kernel_size=3),     
             nn.MaxPool2d(2,2),  # (256,28,28)
+            ResConv2dBlock(in_channels=256,out_channels=256,kernel_size=3),    
             ResConv2dBlock(in_channels=256,out_channels=512,kernel_size=3),    
             nn.MaxPool2d(2,2),  # (512,14,14)
-            ResConv2dBlock(in_channels=512,out_channels=1024,kernel_size=3),   
-            nn.MaxPool2d(2,2),  # (1024,7,7)
+            ResConv2dBlock(in_channels=512,out_channels=512,kernel_size=3),   
+            ResConv2dBlock(in_channels=512,out_channels=512,kernel_size=3),   
+            nn.MaxPool2d(2,2),  # (512,7,7)
         )
     
     def forward(self,x):
@@ -137,20 +142,16 @@ class ResidualClassification(nn.Module):
 
         # fc
         self.fc = nn.Sequential(
-            nn.Linear(1024*7*7, 2048),
-            nn.BatchNorm1d(2048),
-            nn.LeakyReLU(),
+            nn.Linear(512*7*7, 4096),
+            nn.BatchNorm1d(4096),
+            nn.LeakyReLU(inplace=True),
             nn.Dropout(0.2),
-            nn.Linear(2048, 2048),
-            nn.BatchNorm1d(2048),
-            nn.LeakyReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(2048, self.output_dim),
+            nn.Linear(4096, self.output_dim),
         )
 
     def forward(self,img):
         out=self.features(img)
-        out=out.view(-1,1024*7*7)
+        out=out.view(-1,512*7*7)
         out=self.fc(out)
         return out
 
