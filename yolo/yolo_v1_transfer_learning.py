@@ -32,9 +32,11 @@ class YOLO_V1_Transfer(nn.Module):
             nn.Linear(1024*7*7, 2048),
             nn.BatchNorm1d(2048),
             nn.LeakyReLU(),
+            nn.Dropout(0.2),
             nn.Linear(2048, 2048),
             nn.BatchNorm1d(2048),
             nn.LeakyReLU(),
+            nn.Dropout(0.2),
             nn.Linear(2048, HyperParam.S*HyperParam.S*HyperParam.OUT_DIM),
             nn.Sigmoid()
         )
