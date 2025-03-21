@@ -77,13 +77,13 @@ class ResConv2dBlock(nn.Module):
 
         # a conv layer
         self.conv_layer=nn.Sequential(
-            nn.Conv2d(in_channels=self.in_channels,out_channels=self.out_channels,kernel_size=1),
-            nn.BatchNorm2d(self.out_channels),
+            nn.Conv2d(in_channels=self.in_channels,out_channels=self.out_channels//2,kernel_size=1),
+            nn.BatchNorm2d(self.out_channels//2),
             nn.LeakyReLU(),
-            nn.Conv2d(in_channels=self.out_channels,out_channels=self.out_channels,kernel_size=kernel_size,padding=kernel_size//2),
-            nn.BatchNorm2d(self.out_channels),
+            nn.Conv2d(in_channels=self.out_channels//2,out_channels=self.out_channels//2,kernel_size=kernel_size,padding=kernel_size//2),
+            nn.BatchNorm2d(self.out_channels//2),
             nn.LeakyReLU(),
-            nn.Conv2d(in_channels=self.out_channels,out_channels=self.out_channels,kernel_size=1),
+            nn.Conv2d(in_channels=self.out_channels//2,out_channels=self.out_channels,kernel_size=1),
             nn.BatchNorm2d(self.out_channels),
             nn.LeakyReLU(),
         )
@@ -106,17 +106,17 @@ class ResidualFeatures(nn.Module):
     def __init__(self,input_channel=3):
         super().__init__()
         self.feature_representation=nn.Sequential(
-            nn.Conv2d(in_channels=input_channel, out_channels=64, kernel_size=7, padding=7//2), 
+            nn.Conv2d(in_channels=input_channel, out_channels=64, kernel_size=3, padding=3//2), 
             nn.BatchNorm2d(64),
             nn.LeakyReLU(),
             nn.MaxPool2d(2,2),  # (64,112,112)
-            ResConv2dBlock(in_channels=64,out_channels=128,kernel_size=7),      
+            ResConv2dBlock(in_channels=64,out_channels=128,kernel_size=3),      
             nn.MaxPool2d(2,2),  # (128,56,56)
-            ResConv2dBlock(in_channels=128,out_channels=256,kernel_size=7),     
+            ResConv2dBlock(in_channels=128,out_channels=256,kernel_size=3),     
             nn.MaxPool2d(2,2),  # (256,28,28)
-            ResConv2dBlock(in_channels=256,out_channels=512,kernel_size=7),    
+            ResConv2dBlock(in_channels=256,out_channels=512,kernel_size=3),    
             nn.MaxPool2d(2,2),  # (512,14,14)
-            ResConv2dBlock(in_channels=512,out_channels=1024,kernel_size=7),   
+            ResConv2dBlock(in_channels=512,out_channels=1024,kernel_size=3),   
             nn.MaxPool2d(2,2),  # (1024,7,7)
         )
     
