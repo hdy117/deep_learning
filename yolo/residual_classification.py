@@ -112,15 +112,15 @@ class ResidualFeatures(nn.Module):
             nn.LeakyReLU(inplace=True),
             nn.MaxPool2d(2,2),  # (64,112,112)
             ResConv2dBlock(in_channels=64,out_channels=64,kernel_size=3),      
-            ResConv2dBlock(in_channels=64,out_channels=128,kernel_size=3),      
-            nn.MaxPool2d(2,2),  # (128,56,56)
+            ResConv2dBlock(in_channels=64,out_channels=64,kernel_size=3),      
+            nn.MaxPool2d(2,2),  # (64,56,56)
+            ResConv2dBlock(in_channels=64,out_channels=128,kernel_size=3),     
             ResConv2dBlock(in_channels=128,out_channels=128,kernel_size=3),     
-            ResConv2dBlock(in_channels=128,out_channels=256,kernel_size=3),     
-            nn.MaxPool2d(2,2),  # (256,28,28)
+            nn.MaxPool2d(2,2),  # (128,28,28)
+            ResConv2dBlock(in_channels=128,out_channels=256,kernel_size=3),    
             ResConv2dBlock(in_channels=256,out_channels=256,kernel_size=3),    
-            ResConv2dBlock(in_channels=256,out_channels=512,kernel_size=3),    
-            nn.MaxPool2d(2,2),  # (512,14,14)
-            ResConv2dBlock(in_channels=512,out_channels=512,kernel_size=3),   
+            nn.MaxPool2d(2,2),  # (256,14,14)
+            ResConv2dBlock(in_channels=256,out_channels=512,kernel_size=3),   
             ResConv2dBlock(in_channels=512,out_channels=512,kernel_size=3),   
             nn.MaxPool2d(2,2),  # (512,7,7)
         )
