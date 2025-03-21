@@ -16,7 +16,7 @@ from dataset import image_cdf
 
 # 0. hyper param
 class HyperParam:
-    batch_size=64
+    batch_size=256
     n_epoch=30
     lr_step_size=n_epoch//3
     learning_rate=0.001
