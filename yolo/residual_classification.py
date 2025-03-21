@@ -60,7 +60,8 @@ class COCODataset(Dataset):
 
         if self.transform:
             img_pil=self.transform(img_pil)
-            img_pil=image_cdf.apply_cdf_to_channels(img_pil)
+            # img_pil=image_cdf.apply_cdf_to_channels(img_pil)
+            img_pil=img_pil/255.0
         
         # print img
         # print(f'img_pil:{img_pil.mean()}')
@@ -141,11 +142,11 @@ class ResidualClassification(nn.Module):
             nn.Linear(1024*7*7, 2048),
             nn.BatchNorm1d(2048),
             nn.LeakyReLU(),
-            nn.Dropout(0.5),
+            nn.Dropout(0.2),
             nn.Linear(2048, 2048),
             nn.BatchNorm1d(2048),
             nn.LeakyReLU(),
-            nn.Dropout(0.5),
+            nn.Dropout(0.2),
             nn.Linear(2048, self.output_dim),
         )
 
@@ -168,7 +169,7 @@ class ResidualLoss(nn.Module):
 # hyper param
 device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_path=os.path.join(g_file_path,"residual_classification.pth")
-batch_size=32
+batch_size=64
 n_epoch=30
 lr=0.001
 weight_decay=0.0001

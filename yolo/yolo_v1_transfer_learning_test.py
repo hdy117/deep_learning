@@ -10,11 +10,10 @@ sys.path.append(os.path.join(g_file_path,"..","dataset"))
 from dataset import bbox_utils
 
 # test dataloader
-transform=transforms.Compose([transforms.ToTensor()])
 val_dataset=COCODataset(coco_dataset.coco_val_img_dir,
                         coco_dataset.coco_val_sub_annotation_file,
                         img_new_size=HyperParam.IMG_SIZE,
-                        transform=transform)
+                        transform=HyperParam.transform)
 val_data_loader=DataLoader(dataset=val_dataset, 
                            shuffle=False, 
                            batch_size=HyperParam.batch_size)

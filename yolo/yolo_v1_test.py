@@ -10,7 +10,8 @@ sys.path.append(os.path.join(g_file_path,"..","dataset"))
 import bbox_utils
 
 # test dataloader
-val_dataset=COCODataset(coco_dataset.coco_val_img_dir,coco_dataset.coco_val_sub_annotation_file)
+val_dataset=COCODataset(coco_dataset.coco_val_img_dir,
+    coco_dataset.coco_val_sub_annotation_file, transform=HyperParam.transform)
 val_data_loader=DataLoader(dataset=val_dataset, shuffle=True, batch_size=HyperParam.batch_size)
 
 # test
