@@ -77,8 +77,6 @@ class ResConv2dBlock(nn.Module):
 
         # a conv layer
         self.conv_layer=nn.Sequential(
-            nn.BatchNorm2d(self.in_channels),
-            nn.LeakyReLU(),
             nn.Conv2d(in_channels=self.in_channels,out_channels=self.out_channels,kernel_size=1),
             nn.BatchNorm2d(self.out_channels),
             nn.LeakyReLU(),
@@ -86,6 +84,8 @@ class ResConv2dBlock(nn.Module):
             nn.BatchNorm2d(self.out_channels),
             nn.LeakyReLU(),
             nn.Conv2d(in_channels=self.out_channels,out_channels=self.out_channels,kernel_size=1),
+            nn.BatchNorm2d(self.out_channels),
+            nn.LeakyReLU(),
         )
 
         # shortcut
@@ -137,8 +137,8 @@ class ResidualClassification(nn.Module):
 
         # fc
         self.fc = nn.Sequential(
-            nn.BatchNorm1d(1024*7*7),
-            nn.LeakyReLU(),
+            # nn.BatchNorm1d(1024*7*7),
+            # nn.LeakyReLU(),
             nn.Linear(1024*7*7, 2048),
             nn.BatchNorm1d(2048),
             nn.LeakyReLU(),
