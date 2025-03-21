@@ -29,8 +29,6 @@ class YOLO_V1_Transfer(nn.Module):
 
         # 全连接层
         self.fc = nn.Sequential(
-            nn.BatchNorm1d(1024*7*7),
-            nn.LeakyReLU(),
             nn.Linear(1024*7*7, 2048),
             nn.BatchNorm1d(2048),
             nn.LeakyReLU(),
