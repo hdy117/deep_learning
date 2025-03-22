@@ -16,7 +16,7 @@ import resnet18
 import resnet_base
 
 # train dataloader
-train_dataset=COCODataset(coco_dataset.coco_train_img_dir,
+train_dataset=resnet_base.COCODataset(coco_dataset.coco_train_img_dir,
                           coco_dataset.coco_train_sub_annotation_file,
                           img_new_size=resnet_base.img_new_size,
                           target_class=resnet_base.target_class,
@@ -32,7 +32,7 @@ optimizer=torch.optim.Adam(residual_model.parameters(),lr=resnet_base.lr,
     weight_decay=resnet_base.weight_decay)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 
     step_size=resnet_base.lr_step_size, gamma=0.1)
-criterion=ResidualLoss()
+criterion=resnet18.ResidualLoss()
 
 def train():
     # load saved model
@@ -42,7 +42,7 @@ def train():
         print(f'yolo v1 trained model loaded from {resnet_base.model_path}')
 
     # training
-    for epoch in range(n_epoch):
+    for epoch in range(resnet_base.n_epoch):
         print('================train==================')
         t_start=time.time()
         for batch_idx,(samples, labels) in enumerate(train_data_loader):
