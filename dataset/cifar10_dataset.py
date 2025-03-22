@@ -41,10 +41,14 @@ class CustomCIFAR10Dataset(Dataset):
         image = self.images[idx]
         label = self.labels[idx]
 
+        # 将标签转换为one - hot编码
+        one_hot_label = torch.zeros(10)
+        one_hot_label[label] = 1
+
         if self.transform:
             image = self.transform(image)
 
-        return image, label
+        return image, one_hot_label
 
 # 定义数据变换
 transform = transforms.Compose([
