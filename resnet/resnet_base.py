@@ -10,7 +10,6 @@ g_file_path=os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(g_file_path,".."))
 
 from dataset import coco_dataset
-from dataset import cifar10_dataset
 
 # coco dataset
 class COCODataset(Dataset):

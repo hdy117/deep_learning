@@ -45,7 +45,8 @@ def train():
     for epoch in range(resnet_base.n_epoch):
         print('================train==================')
         t_start=time.time()
-        for batch_idx,(samples, labels) in enumerate(train_data_loader):
+        # for batch_idx,(samples, labels) in enumerate(train_data_loader): # train on coco
+        for batch_idx,(samples, labels) in enumerate(cifar10_dataset.train_loader): # train on cifar-10
             # data to resnet_base.device
             samples=samples.to(resnet_base.device)
             labels=labels.to(resnet_base.device)
