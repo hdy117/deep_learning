@@ -99,9 +99,10 @@ def show_img(image, label):
 
 
 if __name__=="__main__":
+    index = 12
     # 从数据集中获取一张图像和对应的标签
-    image, label = train_dataset[0]  # 这里取索引为0的图像，你可以修改索引值
+    image, label = train_dataset[index]  # 这里取索引为0的图像，你可以修改索引值
     show_img(image,label)
 
-    image, label = test_dataset[0]  # 这里取索引为0的图像，你可以修改索引值
+    image, label = test_dataset[index]  # 这里取索引为0的图像，你可以修改索引值
     show_img(image,label)
