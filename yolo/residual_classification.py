@@ -164,7 +164,7 @@ class ResidualLoss(nn.Module):
 # hyper param
 device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_path=os.path.join(g_file_path,"residual_classification.pth")
-batch_size=96
+batch_size=196
 n_epoch=60
 lr=0.001
 weight_decay=0.0005
