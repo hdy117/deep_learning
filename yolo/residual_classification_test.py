@@ -24,7 +24,7 @@ val_data_loader=DataLoader(dataset=val_dataset, shuffle=True,
 # test
 def test():
     # load model
-    model=ResidualClassification(input_channel=3, out_dim=max(target_class))
+    model=ResNet18(input_channel=3, out_dim=max(target_class))
     model=model.to(device)
     if os.path.exists(model_path):
         try:

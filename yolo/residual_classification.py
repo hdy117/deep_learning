@@ -102,7 +102,7 @@ class ResConv2dBlock(nn.Module):
 class ResidualFeatures(nn.Module):
     def __init__(self,input_channel=3):
         super().__init__()
-        self.feature_representation=nn.Sequential(
+        self.features=nn.Sequential(
             nn.Conv2d(in_channels=input_channel, out_channels=32, kernel_size=3, padding=3//2), 
             nn.MaxPool2d(2,2),  # (32,112,112)
             ResConv2dBlock(in_channels=32,out_channels=64,kernel_size=3),      
@@ -123,11 +123,11 @@ class ResidualFeatures(nn.Module):
         '''
         residual conv2d feature, output is [batch_size, 1024, 7, 7]
         '''
-        out=self.feature_representation(x)
+        out=self.features(x)
         return out
 
 # residual classification
-class ResidualClassification(nn.Module):
+class ResNet18(nn.Module):
     def __init__(self,input_channel=3, out_dim=1):
         super().__init__()
         self.output_dim=out_dim
@@ -192,7 +192,7 @@ train_data_loader=DataLoader(dataset=train_dataset, shuffle=True,
                              batch_size=batch_size)
 
 # train
-residual_model=ResidualClassification(input_channel=3, out_dim=out_dim)
+residual_model=ResNet18(input_channel=3, out_dim=out_dim)
 residual_model=residual_model.to(device)
 
 optimizer=torch.optim.Adam(residual_model.parameters(),lr=lr,weight_decay=weight_decay)
