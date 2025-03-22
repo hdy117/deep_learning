@@ -13,7 +13,8 @@ sys.path.append(os.path.join(g_file_path,".."))
 
 from dataset import coco_dataset
 from yolo_v1 import *
-import residual_classification
+import resnet18
+from resnet import resnet18, resnet_base
 
 # 4.0 model define
 class YOLO_V1_Transfer(nn.Module):
@@ -22,14 +23,14 @@ class YOLO_V1_Transfer(nn.Module):
         self.output_dim=HyperParam.OUT_DIM
         # self.vgg = models.vgg16(pretrained=True)
         # self.vgg_features = self.vgg.features
-        self.residual=residual_classification.ResNet18(input_channel=3,out_dim=residual_classification.out_dim)
-        self.residual.load_state_dict(torch.load(residual_classification.model_path))
+        self.residual=resnet18.ResNet18(input_channel=3,out_dim=resnet_base.out_dim)
+        self.residual.load_state_dict(torch.load(resnet_base.model_path))
         self.residual.eval()
         self.residual_feature=self.residual.features
 
         # 全连接层
         self.fc = nn.Sequential(
-            nn.Linear(1024*7*7, 2048),
+            nn.Linear(512*7*7, 2048),
             nn.BatchNorm1d(2048),
             nn.LeakyReLU(inplace=True),
             nn.Dropout(0.2),
@@ -43,7 +44,7 @@ class YOLO_V1_Transfer(nn.Module):
 
     def forward(self,img):
         out=self.residual_feature(img)
-        out=out.view(-1,1024*7*7)
+        out=out.view(-1,512*7*7)
         out=self.fc(out)
         out=out.view(-1,HyperParam.S,HyperParam.S,HyperParam.OUT_DIM)
 
