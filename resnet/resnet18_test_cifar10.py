@@ -21,6 +21,9 @@ combined_dataset=ConcatDataset([cifar10_dataset.test_dataset])
 val_data_loader=DataLoader(dataset=combined_dataset, shuffle=True, 
                            batch_size=resnet_base.batch_size)
 
+# update model path
+resnet_base.model_path=os.path.join(g_file_path, "resnet18_cifar10.pth")
+
 # test
 def test():
     # load model

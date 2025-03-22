@@ -29,6 +29,10 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
     step_size=resnet_base.lr_step_size, gamma=0.1)
 criterion=resnet18.ResidualLoss()
 
+# update model path
+resnet_base.model_path=os.path.join(g_file_path, "resnet18_cifar10.pth")
+resnet_base.batch_size=64
+
 def train():
     # load saved model
     if os.path.exists(resnet_base.model_path):
