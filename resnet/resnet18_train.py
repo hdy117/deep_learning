@@ -15,6 +15,10 @@ from dataset import coco_dataset
 import resnet18
 import resnet_base
 
+# hyper param
+resnet_base.lr=0.0002
+resnet_base.batch_size=192
+
 # train dataloader
 train_dataset=resnet_base.COCODataset(coco_dataset.coco_train_img_dir,
                           coco_dataset.coco_train_sub_annotation_file,
