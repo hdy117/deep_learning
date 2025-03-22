@@ -17,8 +17,8 @@ from dataset import image_cdf
 # 0. hyper param
 class HyperParam:
     batch_size=256
-    n_epoch=30
-    lr_step_size=n_epoch//3
+    n_epoch=40
+    lr_step_size=n_epoch//2
     learning_rate=0.001
     weight_decay=0.0001
     device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
