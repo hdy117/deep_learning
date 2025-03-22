@@ -23,7 +23,8 @@ val_dataset=resnet_base.COCODataset(coco_dataset.coco_val_img_dir,
                         target_class=resnet_base.target_class,
                         transform=resnet_base.transform)
 # combine cifar-10 subset and coco subset
-combined_dataset=ConcatDataset([val_dataset, cifar10_dataset.test_dataset])
+# combined_dataset=ConcatDataset([val_dataset, cifar10_dataset.test_dataset])
+combined_dataset=ConcatDataset([val_dataset])
 val_data_loader=DataLoader(dataset=combined_dataset, shuffle=True, 
                            batch_size=resnet_base.batch_size)
 

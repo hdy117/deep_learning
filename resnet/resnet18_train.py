@@ -22,7 +22,8 @@ train_dataset=resnet_base.COCODataset(coco_dataset.coco_train_img_dir,
                           target_class=resnet_base.target_class,
                           transform=resnet_base.transform)
 # combine cifar-10 subset and coco subset
-combined_dataset=ConcatDataset([train_dataset, cifar10_dataset.train_dataset])
+# combined_dataset=ConcatDataset([train_dataset, cifar10_dataset.train_dataset])
+combined_dataset=ConcatDataset([train_dataset])
 train_data_loader=DataLoader(dataset=combined_dataset, shuffle=True, 
                              batch_size=resnet_base.batch_size)
 
