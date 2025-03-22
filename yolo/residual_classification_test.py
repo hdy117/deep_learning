@@ -37,9 +37,10 @@ def test():
     # Evaluation metrics
     total_samples = 0
     total_correct = 0
-    total_precision = 0
-    total_recall = 0
-    conf_thresh = 0.6  # Adjust threshold if needed
+    total_true_positives = np.zeros(max(target_class))
+    total_predicted_positives = np.zeros(max(target_class))
+    total_actual_positives = np.zeros(max(target_class))
+    conf_thresh = 0.5  # Adjust threshold if needed
 
     with torch.no_grad():
         print('================ Test ==================')
@@ -63,15 +64,12 @@ def test():
             predicted_positives = y_pred_bin.sum(dim=0).cpu().numpy()
             actual_positives = labels.sum(dim=0).cpu().numpy()
 
-            # Avoid division by zero
-            precision = np.divide(true_positives, predicted_positives, out=np.zeros_like(true_positives), where=predicted_positives > 0)
-            recall = np.divide(true_positives, actual_positives, out=np.zeros_like(true_positives), where=actual_positives > 0)
-
             # Aggregate results
             total_correct += batch_correct
             total_samples += batch_total
-            total_precision += precision.mean()
-            total_recall += recall.mean()
+            total_true_positives += true_positives
+            total_predicted_positives += predicted_positives
+            total_actual_positives += actual_positives
 
             # Print sample predictions
             if batch_idx % 10 == 0:
@@ -82,12 +80,16 @@ def test():
 
         # Final Metrics
         accuracy = total_correct / total_samples
-        avg_precision = total_precision / len(val_data_loader)
-        avg_recall = total_recall / len(val_data_loader)
+        precision = np.divide(total_true_positives, total_predicted_positives,
+                              out=np.zeros_like(total_true_positives), where=total_predicted_positives > 0)
+        recall = np.divide(total_true_positives, total_actual_positives,
+                           out=np.zeros_like(total_true_positives), where=total_actual_positives > 0)
+        avg_precision = precision.mean()
+        avg_recall = recall.mean()
 
         print(f'Test Accuracy: {accuracy:.4f}')
-        print(f'Test Precision: {avg_precision:.4f}')
-        print(f'Test Recall: {avg_recall:.4f}')
+        print(f'Test Precision: {avg_precision:.4f}, precision:{np.array2string(precision, precision=3, suppress_small=True)}')
+        print(f'Test Recall: {avg_recall:.4f}, recall:{np.array2string(recall, precision=3, suppress_small=True)}')
 
 # main
 if __name__=="__main__":

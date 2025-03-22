@@ -77,19 +77,17 @@ class ResConv2dBlock(nn.Module):
 
         # a conv layer
         self.conv_layer=nn.Sequential(
+            nn.BatchNorm2d(self.in_channels),
+            nn.LeakyReLU(inplace=True),
             nn.Conv2d(in_channels=self.in_channels,out_channels=self.out_channels,kernel_size=kernel_size,padding=kernel_size//2),
             nn.BatchNorm2d(self.out_channels),
             nn.LeakyReLU(inplace=True),
             nn.Conv2d(in_channels=self.out_channels,out_channels=self.out_channels,kernel_size=kernel_size,padding=kernel_size//2),
-            nn.BatchNorm2d(self.out_channels),
         )
 
         # shortcut
         self.shortcut=(nn.Conv2d(in_channels=self.in_channels, out_channels=self.out_channels,kernel_size=1) \
             if self.in_channels!=self.out_channels else nn.Identity())
-
-        # active
-        self.active=nn.LeakyReLU(inplace=True)
 
     def forward(self, x):
         # conv layer
@@ -98,8 +96,6 @@ class ResConv2dBlock(nn.Module):
         shortcut=self.shortcut(x)
         # residual
         out=conv_layer+shortcut
-        # active function
-        out=self.active(out)
 
         return out
 
@@ -107,11 +103,9 @@ class ResidualFeatures(nn.Module):
     def __init__(self,input_channel=3):
         super().__init__()
         self.feature_representation=nn.Sequential(
-            nn.Conv2d(in_channels=input_channel, out_channels=64, kernel_size=3, padding=3//2), 
-            nn.BatchNorm2d(64),
-            nn.LeakyReLU(inplace=True),
-            nn.MaxPool2d(2,2),  # (64,112,112)
-            ResConv2dBlock(in_channels=64,out_channels=64,kernel_size=3),      
+            nn.Conv2d(in_channels=input_channel, out_channels=32, kernel_size=3, padding=3//2), 
+            nn.MaxPool2d(2,2),  # (32,112,112)
+            ResConv2dBlock(in_channels=32,out_channels=64,kernel_size=3),      
             ResConv2dBlock(in_channels=64,out_channels=64,kernel_size=3),      
             nn.MaxPool2d(2,2),  # (64,56,56)
             ResConv2dBlock(in_channels=64,out_channels=128,kernel_size=3),     
@@ -142,6 +136,8 @@ class ResidualClassification(nn.Module):
 
         # fc
         self.fc = nn.Sequential(
+            nn.BatchNorm1d(512*7*7),
+            nn.LeakyReLU(inplace=True),
             nn.Linear(512*7*7, 4096),
             nn.BatchNorm1d(4096),
             nn.LeakyReLU(inplace=True),
@@ -168,10 +164,10 @@ class ResidualLoss(nn.Module):
 # hyper param
 device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_path=os.path.join(g_file_path,"residual_classification.pth")
-batch_size=64
-n_epoch=30
+batch_size=96
+n_epoch=60
 lr=0.001
-weight_decay=0.0001
+weight_decay=0.0005
 lr_step_size=n_epoch//3
 img_new_size=224
 target_class=[1,2,3,4,5,6,7,8,9,10] # coco category [person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light]
