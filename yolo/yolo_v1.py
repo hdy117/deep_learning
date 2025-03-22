@@ -19,8 +19,8 @@ class HyperParam:
     batch_size=256
     n_epoch=40
     lr_step_size=n_epoch//2
-    learning_rate=0.001
-    weight_decay=0.0001
+    learning_rate=0.0005
+    weight_decay=0.0005
     device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model_path=os.path.join(g_file_path,"yolo_v1.pth") # model path
     transform=transforms.Compose([transforms.ToTensor()])

@@ -31,8 +31,24 @@ class CustomCIFAR10Dataset(Dataset):
                 test_data = pickle.load(f, encoding='bytes')
             self.images = test_data[b'data'].reshape(-1, 3, 32, 32).transpose(0, 2, 3, 1)
             self.labels = test_data[b'labels']
+        
+        # sub_category_id=[1,2,3,4,5,6,7,8,9,10] 
+        # coco category [person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light]
+        # only extract coco matching category
+        category_mapping={0:4,1:2,8:8,9:7}
+        images,labels=[],[]
+        for idx in range(len(self.labels)):
+            if self.labels[idx] in [0,1,8,9]:
+                labels.append(category_mapping[self.labels[idx]])
+                images.append(self.images[idx])
+        
+        # extrac coco matching subset
+        self.images=np.array(images)
+        self.labels=np.array(labels)
 
         self.images = self.images / 255.0  # 像素值归一化到[0, 1]
+
+        print(f'self.images:{self.images.shape}, self.labels:{self.labels.shape}')
 
     def __len__(self):
         return len(self.labels)

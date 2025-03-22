@@ -78,7 +78,7 @@ transform = transforms.Compose([
 
 # hyper param
 device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model_path=os.path.join(g_file_path,"resnet18_coco.pth")
+model_path=os.path.join(g_file_path,"resnet18.pth")
 batch_size=196
 n_epoch=60
 lr=0.001
