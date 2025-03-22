@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, ConcatDataset
 import torchvision.transforms as transforms
 import os,sys,time
 import matplotlib.pyplot as plt
@@ -21,7 +21,9 @@ train_dataset=resnet_base.COCODataset(coco_dataset.coco_train_img_dir,
                           img_new_size=resnet_base.img_new_size,
                           target_class=resnet_base.target_class,
                           transform=resnet_base.transform)
-train_data_loader=DataLoader(dataset=train_dataset, shuffle=True, 
+# combine cifar-10 subset and coco subset
+combined_dataset=ConcatDataset([train_dataset, cifar10_dataset.train_dataset])
+train_data_loader=DataLoader(dataset=combined_dataset, shuffle=True, 
                              batch_size=resnet_base.batch_size)
 
 # train
@@ -45,8 +47,7 @@ def train():
     for epoch in range(resnet_base.n_epoch):
         print('================train==================')
         t_start=time.time()
-        # for batch_idx,(samples, labels) in enumerate(train_data_loader): # train on coco
-        for batch_idx,(samples, labels) in enumerate(cifar10_dataset.train_loader): # train on cifar-10
+        for batch_idx,(samples, labels) in enumerate(train_data_loader):
             # data to resnet_base.device
             samples=samples.to(resnet_base.device)
             labels=labels.to(resnet_base.device)

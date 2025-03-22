@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, ConcatDataset
 import torchvision.transforms as transforms
 import os,sys
 import matplotlib.pyplot as plt
@@ -11,6 +11,7 @@ g_file_path=os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(g_file_path,".."))
 
 from dataset import coco_dataset
+from dataset import cifar10_dataset
 
 import resnet_base
 import resnet18
@@ -21,7 +22,9 @@ val_dataset=resnet_base.COCODataset(coco_dataset.coco_val_img_dir,
                         img_new_size=resnet_base.img_new_size,
                         target_class=resnet_base.target_class,
                         transform=resnet_base.transform)
-val_data_loader=DataLoader(dataset=val_dataset, shuffle=True, 
+# combine cifar-10 subset and coco subset
+combined_dataset=ConcatDataset([val_dataset, cifar10_dataset.test_dataset])
+val_data_loader=DataLoader(dataset=combined_dataset, shuffle=True, 
                            batch_size=resnet_base.batch_size)
 
 # test
