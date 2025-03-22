@@ -48,8 +48,6 @@ class CustomCIFAR10Dataset(Dataset):
 
         self.images = self.images / 255.0  # 像素值归一化到[0, 1]
 
-        print(f'self.images:{self.images.shape}, self.labels:{self.labels.shape}')
-
     def __len__(self):
         return len(self.labels)
 
