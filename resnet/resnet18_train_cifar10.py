@@ -31,7 +31,7 @@ criterion=resnet18.ResidualLoss()
 
 # update model path
 resnet_base.model_path=os.path.join(g_file_path, "resnet18_cifar10.pth")
-resnet_base.batch_size=64
+resnet_base.batch_size=512
 
 def train():
     # load saved model
