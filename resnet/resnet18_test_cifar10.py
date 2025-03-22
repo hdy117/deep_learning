@@ -11,20 +11,13 @@ g_file_path=os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(g_file_path,".."))
 
 from dataset import coco_dataset
-# from dataset import cifar10_dataset
+from dataset import cifar10_dataset
 
 import resnet_base
 import resnet18
 
 # test dataloader
-val_dataset=resnet_base.COCODataset(coco_dataset.coco_val_img_dir,
-                        coco_dataset.coco_val_sub_annotation_file,
-                        img_new_size=resnet_base.img_new_size,
-                        target_class=resnet_base.target_class,
-                        transform=resnet_base.transform)
-# combine cifar-10 subset and coco subset
-# combined_dataset=ConcatDataset([val_dataset, cifar10_dataset.test_dataset])
-combined_dataset=ConcatDataset([val_dataset])
+combined_dataset=ConcatDataset([cifar10_dataset.test_dataset])
 val_data_loader=DataLoader(dataset=combined_dataset, shuffle=True, 
                            batch_size=resnet_base.batch_size)
 

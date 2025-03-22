@@ -35,16 +35,16 @@ class CustomCIFAR10Dataset(Dataset):
         # sub_category_id=[1,2,3,4,5,6,7,8,9,10] 
         # coco category [person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light]
         # only extract coco matching category
-        category_mapping={0:4,1:2,8:8,9:7}
-        images,labels=[],[]
-        for idx in range(len(self.labels)):
-            if self.labels[idx] in [0,1,8,9]:
-                labels.append(category_mapping[self.labels[idx]])
-                images.append(self.images[idx])
+        # category_mapping={0:4,1:2,8:8,9:7}
+        # images,labels=[],[]
+        # for idx in range(len(self.labels)):
+        #     if self.labels[idx] in [0,1,8,9]:
+        #         labels.append(category_mapping[self.labels[idx]])
+        #         images.append(self.images[idx])
         
-        # extrac coco matching subset
-        self.images=np.array(images)
-        self.labels=np.array(labels)
+        # # extrac coco matching subset
+        # self.images=np.array(images)
+        # self.labels=np.array(labels)
 
         self.images = self.images / 255.0  # 像素值归一化到[0, 1]
 
