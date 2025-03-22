@@ -13,7 +13,7 @@ sys.path.append(os.path.join(g_file_path,".."))
 from dataset import coco_dataset
 
 import resnet_base
-from resnet18 import *
+import resnet18
 
 # test dataloader
 val_dataset=resnet_base.COCODataset(coco_dataset.coco_val_img_dir,
@@ -27,7 +27,7 @@ val_data_loader=DataLoader(dataset=val_dataset, shuffle=True,
 # test
 def test():
     # load model
-    model=ResNet18(input_channel=3, out_dim=max(resnet_base.target_class))
+    model=resnet18.ResNet18(input_channel=3, out_dim=max(resnet_base.target_class))
     model=model.to(resnet_base.device)
     if os.path.exists(resnet_base.model_path):
         try:

@@ -12,7 +12,7 @@ sys.path.append(os.path.join(g_file_path,".."))
 from dataset import coco_dataset
 from dataset import cifar10_dataset
 
-from resnet18 import *
+import resnet18
 import resnet_base
 
 # train dataloader
@@ -25,7 +25,7 @@ train_data_loader=DataLoader(dataset=train_dataset, shuffle=True,
                              batch_size=resnet_base.batch_size)
 
 # train
-residual_model=ResNet18(input_channel=3, out_dim=resnet_base.out_dim)
+residual_model=resnet18.ResNet18(input_channel=3, out_dim=resnet_base.out_dim)
 residual_model=residual_model.to(resnet_base.device)
 
 optimizer=torch.optim.Adam(residual_model.parameters(),lr=resnet_base.lr,
