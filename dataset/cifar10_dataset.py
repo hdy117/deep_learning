@@ -55,7 +55,7 @@ transform = transforms.Compose([
     transforms.ToPILImage(),
     transforms.Resize((Image_Size,Image_Size)),
     transforms.ToTensor(),
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+    # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
 ])
 
 # 创建训练集
@@ -70,10 +70,10 @@ test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=T
 
 def show_img(image, label):
     # 反归一化操作，恢复图像原始像素值范围
-    mean = np.array([0.4914, 0.4822, 0.4465])
-    std = np.array([0.2023, 0.1994, 0.2010])
+    # mean = np.array([0.4914, 0.4822, 0.4465])
+    # std = np.array([0.2023, 0.1994, 0.2010])
     image = image.numpy().transpose(1, 2, 0)  # 将通道维度移到最后
-    image = image * std + mean
+    # image = image * std + mean
     image = np.clip(image, 0, 1)  # 确保像素值在[0, 1]之间
 
     # 显示图像
