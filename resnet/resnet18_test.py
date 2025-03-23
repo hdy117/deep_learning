@@ -47,7 +47,7 @@ def test():
     total_true_positives = np.zeros(max(resnet_base.target_class))
     total_predicted_positives = np.zeros(max(resnet_base.target_class))
     total_actual_positives = np.zeros(max(resnet_base.target_class))
-    conf_thresh = 0.51  # Adjust threshold if needed
+    conf_thresh = 0.6  # Adjust threshold if needed
 
     with torch.no_grad():
         print('================ Test ==================')
