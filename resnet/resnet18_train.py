@@ -17,7 +17,7 @@ import resnet_base
 
 # hyper param
 resnet_base.lr=0.0002
-resnet_base.batch_size=192
+resnet_base.batch_size=128
 
 # train dataloader
 train_dataset=resnet_base.COCODataset(coco_dataset.coco_train_img_dir,
