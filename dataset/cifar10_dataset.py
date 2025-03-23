@@ -46,7 +46,7 @@ class CustomCIFAR10Dataset(Dataset):
         # self.images=np.array(images)
         # self.labels=np.array(labels)
 
-        self.images = self.images / 255.0  # 像素值归一化到[0, 1]
+        # self.images = self.images / 255.0  # 像素值归一化到[0, 1]
 
     def __len__(self):
         return len(self.labels)
