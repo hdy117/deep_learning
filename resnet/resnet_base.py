@@ -68,6 +68,8 @@ class COCODataset(Dataset):
 
 # train dataloader
 transform = transforms.Compose([
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomRotation(15),
     # 将 PIL 图像转换为 PyTorch 张量
     transforms.ToTensor()
     # 对图像进行归一化处理

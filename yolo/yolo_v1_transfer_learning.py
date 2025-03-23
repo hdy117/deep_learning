@@ -80,22 +80,26 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=HyperParam.lr_s
 criterion=YOLO_V1_Loss()
 
 def train():
+    # freeze conv layer of resnet18
+    retrain_resnet18=False
+
     # load saved model
     if os.path.exists(HyperParam.model_path):
         yolo_v1_transfer.load_state_dict(torch.load(HyperParam.model_path))
         yolo_v1_transfer.train()
         print(f'yolo v1 trained model loaded from {HyperParam.model_path}')
     else:
-        # 冻结 VGG 模型的卷积层
-        retrain_resnet18=True
+        # load resnet18
         yolo_v1_transfer.residual.load_state_dict(torch.load(resnet_base.model_path))
         if retrain_resnet18:
             yolo_v1_transfer.residual.train()
         else:
             yolo_v1_transfer.residual.eval()
-        for param in yolo_v1_transfer.residual.features.parameters():
-            param.requires_grad = retrain_resnet18
         print(f'load model from {resnet_base.model_path}, and set retrain to {retrain_resnet18}')
+
+    # freeze conv layer of resnet18
+    for param in yolo_v1_transfer.residual.features.parameters():
+            param.requires_grad = retrain_resnet18
 
     # training
     for epoch in range(HyperParam.n_epoch):
