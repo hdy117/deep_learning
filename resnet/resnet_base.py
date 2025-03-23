@@ -60,7 +60,6 @@ class COCODataset(Dataset):
         if self.transform:
             img_pil=self.transform(img_pil)
             # img_pil=image_cdf.apply_cdf_to_channels(img_pil)
-            img_pil=img_pil/255.0
         
         # print img
         # print(f'img_pil:{img_pil.mean()}')
@@ -87,3 +86,12 @@ img_new_size=224
 target_class=[1,2,3,4,5,6,7,8,9,10] # coco category [person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light]
 out_dim=max(target_class)
 # target_class=[val for val in range(1,91)] # coco category [person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light]
+
+if __name__=="__main__":
+    train_dataset=COCODataset(coco_dataset.coco_train_img_dir,
+                          coco_dataset.coco_train_sub_annotation_file,
+                          img_new_size=img_new_size,
+                          target_class=target_class,
+                          transform=transform)
+    sample,label=train_dataset[12]
+    print(f'{sample.mean()}')

@@ -75,7 +75,7 @@ yolo_v1_transfer=yolo_v1_transfer.to(HyperParam.device)
 HyperParam.model_path=os.path.join(g_file_path, 'yolo_v1_transfer.pth')
 
 # optimizer
-optimizer=torch.optim.SGD(yolo_v1_transfer.parameters(),lr=HyperParam.learning_rate,weight_decay=HyperParam.weight_decay,momentum=0.8)
+optimizer=torch.optim.Adam(yolo_v1_transfer.parameters(),lr=HyperParam.learning_rate,weight_decay=HyperParam.weight_decay)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=HyperParam.lr_step_size, gamma=0.1)
 criterion=YOLO_V1_Loss()
 

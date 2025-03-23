@@ -24,8 +24,8 @@ class HyperParam:
     device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model_path=os.path.join(g_file_path,"yolo_v1.pth") # model path
     transform=transforms.Compose([
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(15),
+        # transforms.RandomHorizontalFlip(),
+        # transforms.RandomRotation(15),
         transforms.ToTensor()])
 
     # label info
@@ -114,7 +114,9 @@ class COCODataset(Dataset):
         if self.transform:
             img_data=self.transform(img_data)
             # img_data=image_cdf.apply_cdf_to_channels(img_data)
-            img_data=img_data/255.0
+
+        # print img
+        # print(f'img_data:{img_data.mean()}')
 
         return img_data, labels
 
@@ -249,3 +251,11 @@ class YOLO_V1_Loss(nn.Module):
         loss = loss_obj_coord.sum() + loss_obj_confidence.sum() + loss_obj_class.sum() + loss_noobj_confidence.sum()
 
         return loss
+
+if __name__=="__main__":
+    val_dataset=COCODataset(coco_dataset.coco_val_img_dir,
+                        coco_dataset.coco_val_sub_annotation_file,
+                        img_new_size=HyperParam.IMG_SIZE,
+                        transform=HyperParam.transform)
+    sample,label=val_dataset[12]
+    print(f'{sample.mean()}')
