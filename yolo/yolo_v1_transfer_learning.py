@@ -58,7 +58,7 @@ class YOLO_V1_Transfer(nn.Module):
 HyperParam.learning_rate=0.0005
 HyperParam.weight_decay=0.0005
 HyperParam.batch_size=512
-HyperParam.n_epoch=40
+HyperParam.n_epoch=18
 HyperParam.lr_step_size=HyperParam.n_epoch//2
 
 # train dataloader
