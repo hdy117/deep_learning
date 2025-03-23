@@ -23,7 +23,7 @@ yolo_v1=YOLO_V1_Transfer()
 yolo_v1=yolo_v1.to(HyperParam.device)
 
 # draw and save bbox image
-bbox_utils=bbox_utils.BBOXUtils(out_folder=os.path.join(g_file_path,"transfer_bbox_test"))
+bbox_utils=bbox_utils.BBOXUtils(out_folder=os.path.join(g_file_path,"yolo_v1_transfer_bbox_test"))
 
 # update transfer learning model path
 HyperParam.model_path=os.path.join(g_file_path, 'yolo_v1_transfer.pth')

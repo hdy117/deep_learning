@@ -19,7 +19,7 @@ yolo_v1=YOLO_V1()
 yolo_v1=yolo_v1.to(HyperParam.device)
 
 # draw and save bbox image
-bbox_utils=bbox_utils.BBOXUtils(out_folder=os.path.join(g_file_path,"test"))
+bbox_utils=bbox_utils.BBOXUtils(out_folder=os.path.join(g_file_path,"yolo_v1_bbox_test"))
 
 def test():
     # load saved model
