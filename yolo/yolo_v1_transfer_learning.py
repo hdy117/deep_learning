@@ -84,10 +84,14 @@ def train():
         print(f'yolo v1 trained model loaded from {HyperParam.model_path}')
     else:
         # 冻结 VGG 模型的卷积层
+        retrain_resnet18=False
         yolo_v1_transfer.residual.load_state_dict(torch.load(resnet_base.model_path))
-        yolo_v1_transfer.residual.train()
+        if retrain_resnet18:
+            yolo_v1_transfer.residual.train()
+        else:
+            yolo_v1_transfer.residual.eval()
         for param in yolo_v1_transfer.residual.features.parameters():
-            param.requires_grad = False
+            param.requires_grad = retrain_resnet18
 
     # training
     for epoch in range(HyperParam.n_epoch):
