@@ -13,7 +13,6 @@ sys.path.append(os.path.join(g_file_path,".."))
 
 from dataset import coco_dataset
 from yolo_v1 import *
-import resnet18
 from resnet import resnet18, resnet_base
 
 # 4.0 model define
@@ -24,8 +23,6 @@ class YOLO_V1_Transfer(nn.Module):
         # self.vgg = models.vgg16(pretrained=True)
         # self.vgg_features = self.vgg.features
         self.residual=resnet18.ResNet18(input_channel=3,out_dim=resnet_base.out_dim)
-        self.residual.load_state_dict(torch.load(resnet_base.model_path))
-        self.residual.eval()
         self.residual_feature=self.residual.features
 
         # 全连接层
@@ -54,6 +51,10 @@ class YOLO_V1_Transfer(nn.Module):
 
         return pred_class, pred_coord, pred_conf
     
+# hyper param
+HyperParam.learning_rate=0.0002
+HyperParam.weight_decay=0.0005
+
 # train dataloader
 train_dataset=COCODataset(coco_dataset.coco_train_img_dir,
                           coco_dataset.coco_train_sub_annotation_file,
@@ -70,10 +71,6 @@ yolo_v1_transfer=yolo_v1_transfer.to(HyperParam.device)
 # update transfer learning model path
 HyperParam.model_path=os.path.join(g_file_path, 'yolo_v1_transfer.pth')
 
-# 冻结 VGG 模型的卷积层
-for param in yolo_v1_transfer.residual.features.parameters():
-    param.requires_grad = False
-
 # optimizer
 optimizer=torch.optim.Adam(yolo_v1_transfer.parameters(),lr=HyperParam.learning_rate,weight_decay=HyperParam.weight_decay)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=HyperParam.lr_step_size, gamma=0.1)
@@ -85,6 +82,12 @@ def train():
         yolo_v1_transfer.load_state_dict(torch.load(HyperParam.model_path))
         yolo_v1_transfer.train()
         print(f'yolo v1 trained model loaded from {HyperParam.model_path}')
+    else:
+        # 冻结 VGG 模型的卷积层
+        yolo_v1_transfer.residual.load_state_dict(torch.load(resnet_base.model_path))
+        yolo_v1_transfer.residual.train()
+        for param in yolo_v1_transfer.residual.features.parameters():
+            param.requires_grad = False
 
     # training
     for epoch in range(HyperParam.n_epoch):
