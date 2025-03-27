@@ -16,15 +16,17 @@ coco_annotation_dir=os.path.join(coco_root_dir,'Annotations')
 coco_train_img_dir=os.path.join(coco_img_dir,'train2017')
 # full annotation file
 coco_train_annotation_file=os.path.join(coco_annotation_dir,'annotations_trainval2017','annotations','instances_train2017.json')
-# sub annotation file
-coco_train_sub_annotation_file=os.path.join(coco_annotation_dir,'annotations_trainval2017','annotations','train_subset.json')
 
 # coco annotation of val
 coco_val_img_dir=os.path.join(coco_img_dir,'val2017')
 # full annotation file
 coco_val_annotation_file=os.path.join(coco_annotation_dir,'annotations_trainval2017','annotations','instances_val2017.json')
-# sub annotation file
-coco_val_sub_annotation_file=os.path.join(coco_annotation_dir,'annotations_trainval2017','annotations','val_subset.json')
+
+# coco sub categories
+coco_10_categories = [1,2,3,4,5,6,7,8,9,10]
+coco_3_categories = [1,2,3]
+
+
 
 class ImgLabelResize:
     def __init__(self):
@@ -132,10 +134,21 @@ class COCOParser:
         self.img_dir=img_dir
         self.anno_file=annotation_file
         self.coco:COCO=COCO(annotation_file)
+        self.target_category_ids:list[int]=[id for id in range(1,91)]
+
+        self.set_target_category_id(self.target_category_ids)
     
     def get_img_infos(self)->list[dict]:
-        img_ids=self.coco.getImgIds()
-        img_infos=self.coco.loadImgs(img_ids)
+        all_img_ids=self.coco.getImgIds()
+        filter_img_ids=[]
+        for img_id in all_img_ids:
+            anno_infos=self.get_annotation_infos_by_img_id(img_id)
+            for anno_info in anno_infos:
+                if anno_info['category_id'] in self.target_category_ids:
+                   filter_img_ids.append(img_id)
+                   continue 
+        filter_img_ids=list(set(filter_img_ids))
+        img_infos=self.coco.loadImgs(filter_img_ids)
         return img_infos
 
     def get_img_num(self)->int:
@@ -160,9 +173,20 @@ class COCOParser:
         return anno_infos
 
     def get_category_info(self, category_id) -> dict:
-        return self.coco.loadCats(category_id)[0]
+        try:
+            category_infos=self.coco.loadCats(category_id)
+            return category_infos[0]
+        except Exception as e:
+            print(f'error, fail to get category info about {category_id}')
+            return None
     
-    def test_get_annotation(self):
+    def set_target_category_id(self, target_category_ids:list[int]=coco_10_categories):
+        self.target_category_ids=target_category_ids
+
+    def test_get_annotation(self, target_category_ids:list[int]=coco_3_categories):
+        # set target category id
+        self.set_target_category_id(target_category_ids)
+
         # category
         train_catgory_ids=self.coco.getCatIds()
         print(f'train_catgory_ids:{train_catgory_ids}')
@@ -176,24 +200,24 @@ class COCOParser:
         # get image info
         img_infos=self.get_img_infos()
         img_info=img_infos[15]
-        print(f'img_name:{self.get_img_name(img_info)}, img_id:{self.get_img_id(img_info)}')
+        # print(f'img_name:{self.get_img_name(img_info)}, img_id:{self.get_img_id(img_info)}')
 
         # load image
         img_data=self.load_img(self.get_img_name(img_info))
-        print(f'img shape:{img_data.size}')
+        # print(f'img shape:{img_data.size}')
         origin_width,origin_height=img_data.size
         img_data=ImgLabelResize.image_resize(img=img_data,new_size=224)
 
         # get image annotation of an image
         anno_infos=self.get_annotation_infos_by_img_id(self.get_img_id(img_info))
         for anno_info in anno_infos:
-            print(f'anno_info:{anno_info}, category_id:{anno_info["category_id"]}, bbox:{anno_info["bbox"]}')
+            # print(f'anno_info:{anno_info}, category_id:{anno_info["category_id"]}, bbox:{anno_info["bbox"]}')
             cat_info=self.get_category_info(anno_info["category_id"])
-            print(f'category_id:{anno_info["category_id"]}, cat_info:{cat_info}')
+            # print(f'category_id:{anno_info["category_id"]}, cat_info:{cat_info}')
             anno_info["bbox"]=ImgLabelResize.label_resize(origin_width,origin_height,anno_info["bbox"],224)
-            print(f'anno_info:{anno_info}')
+            # print(f'anno_info:{anno_info}')
             anno_info["segmentation"]=[] # clear segmentation for now
-            print(f'bbox:{anno_info["bbox"]}')
+            # print(f'bbox:{anno_info["bbox"]}')
 
         plt.imshow(img_data)
         self.coco.showAnns(anno_infos, draw_bbox=True)
@@ -201,10 +225,10 @@ class COCOParser:
 
 
 if __name__=="__main__":
-    coco_train_parser=COCOParser(img_dir=coco_train_img_dir, annotation_file=coco_train_sub_annotation_file)
-    coco_train_parser.test_get_annotation()
+    coco_train_parser=COCOParser(img_dir=coco_train_img_dir, annotation_file=coco_train_annotation_file)
+    coco_train_parser.test_get_annotation(target_category_ids=coco_3_categories)
 
-    coco_test_parser=COCOParser(img_dir=coco_val_img_dir, annotation_file=coco_val_sub_annotation_file)
-    coco_test_parser.test_get_annotation()
+    coco_test_parser=COCOParser(img_dir=coco_val_img_dir, annotation_file=coco_val_annotation_file)
+    coco_test_parser.test_get_annotation(target_category_ids=coco_3_categories)
 
 
