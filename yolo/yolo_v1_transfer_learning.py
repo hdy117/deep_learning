@@ -11,6 +11,7 @@ import torchvision.models as models
 g_file_path=os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(g_file_path,".."))
 
+import yolo_v1
 from dataset import coco_dataset
 from yolo_v1 import *
 from resnet import resnet18, resnet_base
@@ -62,7 +63,7 @@ HyperParam.n_epoch=18
 HyperParam.lr_step_size=HyperParam.n_epoch//2
 
 # train dataloader
-train_dataset=COCODataset(coco_dataset.coco_train_img_dir,
+train_dataset=yolo_v1.COCODataset(coco_dataset.coco_train_img_dir,
                           coco_dataset.coco_train_annotation_file,
                           img_new_size=HyperParam.IMG_SIZE,
                           transform=HyperParam.transform,
