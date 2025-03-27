@@ -63,9 +63,10 @@ HyperParam.lr_step_size=HyperParam.n_epoch//2
 
 # train dataloader
 train_dataset=COCODataset(coco_dataset.coco_train_img_dir,
-                          coco_dataset.coco_train_sub_annotation_file,
+                          coco_dataset.coco_train_annotation_file,
                           img_new_size=HyperParam.IMG_SIZE,
-                          transform=HyperParam.transform)
+                          transform=HyperParam.transform,
+                          target_class=HyperParam.TARGET_CLASS_LABELS)
 train_data_loader=DataLoader(dataset=train_dataset, 
                              shuffle=True,
                              batch_size=HyperParam.batch_size)

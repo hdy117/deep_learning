@@ -13,12 +13,13 @@ from dataset import coco_dataset
 
 # coco dataset
 class COCODataset(Dataset):
-    def __init__(self, img_folder, anno_file_path, img_new_size=224, target_class:list=[1,2,3], transform=None):
+    def __init__(self, img_folder, anno_file_path, img_new_size=224, target_class:list=coco_dataset.coco_10_categories, transform=None):
         super().__init__()
         self.transform=transform
         self.target_class=target_class
         self.img_new_size=img_new_size
         self.coco_parser=coco_dataset.COCOParser(img_dir=img_folder, annotation_file=anno_file_path)
+        self.coco_parser.set_target_category_id(target_category_ids=target_class)
         self.img_infos=self.coco_parser.get_img_infos()
 
     def __len__(self):
@@ -85,13 +86,13 @@ lr=0.0005
 weight_decay=0.0005
 lr_step_size=n_epoch//2
 img_new_size=224
-target_class=[1,2,3,4,5,6,7,8,9,10] # coco category [person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light]
+target_class=coco_dataset.coco_10_categories # coco category [person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light]
 out_dim=max(target_class)
 # target_class=[val for val in range(1,91)] # coco category [person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light]
 
 if __name__=="__main__":
     train_dataset=COCODataset(coco_dataset.coco_train_img_dir,
-                          coco_dataset.coco_train_sub_annotation_file,
+                          coco_dataset.coco_train_annotation_file,
                           img_new_size=img_new_size,
                           target_class=target_class,
                           transform=transform)

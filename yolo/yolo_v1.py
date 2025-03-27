@@ -36,16 +36,17 @@ class HyperParam:
     CONFIDENT_SIZE=int(1) 
     # NUM_CLASS=int(90)
     NUM_CLASS=int(3)
-    TARGET_CLASS_LABELS=[1,2,3] # [person,bicycle,car]
+    TARGET_CLASS_LABELS=coco_dataset.coco_3_categories # [person,bicycle,car]
     OUT_DIM=int(NUM_CLASS+BBOX_SIZE+CONFIDENT_SIZE) # output dim, NUM_CLASS+BBOX_SIZE+CONFIDENT_SIZE
 
 # 1. prepare dataset
 class COCODataset(Dataset):
-    def __init__(self, img_folder, anno_file_path, img_new_size=HyperParam.IMG_SIZE, transform=None):
+    def __init__(self, img_folder, anno_file_path, img_new_size=HyperParam.IMG_SIZE, transform=None, target_class=coco_dataset.coco_3_categories):
         super().__init__()
         self.transform=transform
         self.img_new_size=img_new_size
         self.coco_parser=coco_dataset.COCOParser(img_dir=img_folder, annotation_file=anno_file_path)
+        self.coco_parser.set_target_category_id(target_category_ids=target_class)
         self.img_infos=self.coco_parser.get_img_infos()
 
     def __len__(self):

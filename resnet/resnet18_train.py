@@ -23,7 +23,7 @@ resnet_base.lr_step_size=resnet_base.n_epoch//2
 
 # train dataloader
 train_dataset=resnet_base.COCODataset(coco_dataset.coco_train_img_dir,
-                          coco_dataset.coco_train_sub_annotation_file,
+                          coco_dataset.coco_train_annotation_file,
                           img_new_size=resnet_base.img_new_size,
                           target_class=resnet_base.target_class,
                           transform=resnet_base.transform)
