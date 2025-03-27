@@ -136,7 +136,11 @@ class COCOParser:
         self.coco:COCO=COCO(annotation_file)
         self.target_category_ids:list[int]=[id for id in range(1,91)]
 
+        # set target category ids
         self.set_target_category_id(self.target_category_ids)
+
+        # print filtered img info
+        self.get_img_num()
     
     def get_img_infos(self)->list[dict]:
         all_img_ids=self.coco.getImgIds()
@@ -149,6 +153,7 @@ class COCOParser:
                    continue 
         filter_img_ids=list(set(filter_img_ids))
         img_infos=self.coco.loadImgs(filter_img_ids)
+        print(f'target_category_ids:{self.target_category_ids}, img number:{len(img_infos)}')
         return img_infos
 
     def get_img_num(self)->int:
