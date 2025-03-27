@@ -50,7 +50,7 @@ class COCODataset(Dataset):
         self.img_infos=self.coco_parser.get_img_infos()
 
     def __len__(self):
-        return self.coco_parser.get_img_num()
+        return len(self.img_infos)
 
     def __getitem__(self, index):
         """
