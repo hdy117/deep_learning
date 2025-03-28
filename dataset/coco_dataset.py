@@ -82,7 +82,7 @@ class ImgLabelResize:
         return [x,y,width,height]
 
 class COCOParser:
-    def __init__(self, img_dir=coco_train_img_dir, annotation_file=coco_train_annotation_file):
+    def __init__(self, img_dir=coco_train_img_dir, annotation_file=coco_train_annotation_file,execlusive_category_id=1):
         '''
         {
             "images": [
@@ -137,6 +137,7 @@ class COCOParser:
         self.anno_file=annotation_file
         self.coco:COCO=COCO(annotation_file)
         self.target_category_ids:list[int]=[id for id in range(1,91)]
+        self.execlusive_category_id=execlusive_category_id
 
         # set target category ids
         self.set_target_category_id(self.target_category_ids)
@@ -196,7 +197,7 @@ class COCOParser:
         return img_infos
 
     def get_img_num(self)->int:
-        return len(self.get_img_infos())
+        return len(self.get_img_infos(self.execlusive_category_id))
     
     def get_img_name(self, img_info)->str:
         return img_info['file_name']
