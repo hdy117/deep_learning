@@ -25,7 +25,7 @@ val_dataset=resnet_base.COCODataset(coco_dataset.coco_val_img_dir,
                         coco_dataset.coco_val_annotation_file,
                         img_new_size=resnet_base.img_new_size,
                         target_class=resnet_base.target_class,
-                        transform=resnet_base.transform)
+                        transform=transforms.ToTensor())
 # combine cifar-10 subset and coco subset
 # combined_dataset=ConcatDataset([val_dataset, cifar10_dataset.test_dataset])
 combined_dataset=ConcatDataset([val_dataset])

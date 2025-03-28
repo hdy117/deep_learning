@@ -23,10 +23,7 @@ class HyperParam:
     weight_decay=0.0005
     device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model_path=os.path.join(g_file_path,"yolo_v1.pth") # model path
-    transform=transforms.Compose([
-        # transforms.RandomHorizontalFlip(),
-        # transforms.RandomRotation(15),
-        transforms.ToTensor()])
+    transform=transforms.Compose([transforms.ToTensor()])
 
     # label info
     S=7 # input image will be splitted into SxS anchors
