@@ -141,7 +141,7 @@ class COCOParser:
         # set target category ids
         self.set_target_category_id(self.target_category_ids)
     
-    def get_img_infos(self)->list[dict]:
+    def get_img_infos(self,execlusive_category_id=1)->list[dict]:
         # category maps
         category_maps={} # {id:[img_ids]}
         for categtory_id in self.target_category_ids:
@@ -156,7 +156,6 @@ class COCOParser:
             anno_infos=self.get_annotation_infos_by_img_id(img_id)
             for anno_info in anno_infos:
                 if anno_info['category_id'] in self.target_category_ids:
-                   filter_img_ids.append(img_id)
                    category_maps[anno_info['category_id']].append(img_id)
                    continue
 
@@ -170,11 +169,22 @@ class COCOParser:
         # duplicate img id so that number of each category is balanced
         for category_id in category_maps.keys():
             num_of_samples=len(category_maps[category_id])
-            num_of_samples_to_add=(max_num_of_id-num_of_samples)//2
+            num_of_samples_to_add=(max_num_of_id-num_of_samples)
             if num_of_samples_to_add>0 and num_of_samples>0:
                 for _ in range(num_of_samples_to_add):
+                    # get dumplicate img id
                     sample_idx=random.randint(0,num_of_samples-1)
-                    category_maps[category_id].append(category_maps[category_id][sample_idx])
+                    dump_img_id=category_maps[category_id][sample_idx]
+
+                    # dumplicate img only if execlusive_category_id not in this img
+                    has_execlusive_category_id=False
+                    anno_infos=self.get_annotation_infos_by_img_id(dump_img_id)
+                    for anno_info in anno_infos:
+                        if anno_info['category_id'] == execlusive_category_id:
+                            has_execlusive_category_id=True
+                            break
+                    if not has_execlusive_category_id:
+                        category_maps[category_id].append(dump_img_id)
             
             if num_of_samples>0:
                 print(f'category_id:{category_id}, origin num_of_samples:{num_of_samples}, number of samples:{len(category_maps[category_id])}')
