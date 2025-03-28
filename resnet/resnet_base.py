@@ -69,12 +69,10 @@ class COCODataset(Dataset):
 
 # train dataloader
 transform = transforms.Compose([
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomRotation(15),
-    # 将 PIL 图像转换为 PyTorch 张量
+    # transforms.RandomHorizontalFlip(),
+    # transforms.RandomRotation(15),
+    transforms.RandomRotation(180),
     transforms.ToTensor()
-    # 对图像进行归一化处理
-    # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
 # hyper param
@@ -82,11 +80,11 @@ device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_path=os.path.join(g_file_path,"resnet18.pth")
 batch_size=128
 n_epoch=40
-lr=0.0005
+lr=0.0001
 weight_decay=0.0005
 lr_step_size=n_epoch//2
 img_new_size=224
-target_class=coco_dataset.coco_10_categories # coco category [person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light]
+target_class=coco_dataset.coco_10_categories # coco category [bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light]
 out_dim=max(target_class)
 # target_class=[val for val in range(1,91)] # coco category [person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light]
 

@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import os
 from PIL import Image
 import numpy as np
+import random
 
 file_path=os.path.dirname(os.path.abspath(__file__))
 
@@ -23,8 +24,9 @@ coco_val_img_dir=os.path.join(coco_img_dir,'val2017')
 coco_val_annotation_file=os.path.join(coco_annotation_dir,'annotations_trainval2017','annotations','instances_val2017.json')
 
 # coco sub categories
-coco_10_categories = [1,2,3,4,5,6,7,8,9,10]
+coco_10_categories = [1,2,3,4,5,6,7,8,9,10] # [person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light]
 coco_3_categories = [1,2,3]
+coco_9_in_10_catetgories = [2,3,4,5,6,7,8,9,10] 
 
 
 
@@ -138,20 +140,47 @@ class COCOParser:
 
         # set target category ids
         self.set_target_category_id(self.target_category_ids)
-
-        # print filtered img info
-        self.get_img_num()
     
     def get_img_infos(self)->list[dict]:
+        # category maps
+        category_maps={} # {id:[img_ids]}
+        for categtory_id in self.target_category_ids:
+            category_maps[categtory_id]=[]
+
+        # get all img ids
         all_img_ids=self.coco.getImgIds()
+
+        # filter img id by categories
         filter_img_ids=[]
         for img_id in all_img_ids:
             anno_infos=self.get_annotation_infos_by_img_id(img_id)
             for anno_info in anno_infos:
                 if anno_info['category_id'] in self.target_category_ids:
                    filter_img_ids.append(img_id)
-                   continue 
-        filter_img_ids=list(set(filter_img_ids))
+                   category_maps[anno_info['category_id']].append(img_id)
+                   continue
+
+        # set of category_maps
+        max_num_of_id=0
+        for category_id in category_maps.keys():
+            category_maps[category_id]=list(set(category_maps[category_id]))
+            max_num_of_id=max(max_num_of_id, len(category_maps[category_id]))
+        print(f'max_num_of_id:{max_num_of_id}')
+
+        # duplicate img id so that number of each category is balanced
+        for category_id in category_maps.keys():
+            num_of_samples=len(category_maps[category_id])
+            num_of_samples_to_add=(max_num_of_id-num_of_samples)//2
+            if num_of_samples_to_add>0 and num_of_samples>0:
+                for _ in range(num_of_samples_to_add):
+                    sample_idx=random.randint(0,num_of_samples-1)
+                    category_maps[category_id].append(category_maps[category_id][sample_idx])
+            
+            if num_of_samples>0:
+                print(f'category_id:{category_id}, origin num_of_samples:{num_of_samples}, number of samples:{len(category_maps[category_id])}')
+                filter_img_ids.extend(category_maps[category_id])
+
+        # get img infos        
         img_infos=self.coco.loadImgs(filter_img_ids)
         print(f'target_category_ids:{self.target_category_ids}, img number:{len(img_infos)}')
         return img_infos

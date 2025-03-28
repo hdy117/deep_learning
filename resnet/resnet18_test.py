@@ -16,6 +16,10 @@ from dataset import coco_dataset
 import resnet_base
 import resnet18
 
+# hyper param
+resnet_base.target_class=coco_dataset.coco_10_categories
+resnet_base.batch_size=512
+
 # test dataloader
 val_dataset=resnet_base.COCODataset(coco_dataset.coco_val_img_dir,
                         coco_dataset.coco_val_annotation_file,
