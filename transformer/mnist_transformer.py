@@ -77,6 +77,8 @@ class MnistTransformer(nn.Module):
         self.fc = nn.Sequential(
             nn.Linear(d_model, 1024),
             nn.ReLU(),
+            nn.Linear(1024,1024),
+            nn.ReLU(),
             nn.Linear(1024, num_classes),
             nn.Sigmoid()
         )
@@ -88,10 +90,10 @@ class MnistTransformer(nn.Module):
         x=x.contiguous().view(N,H,W)
 
         # embeding
-        # x=self.x_embeding(x)
+        x=self.x_embeding(x)
 
         # positional encoding
-        # x=self.pos_encoding(x)
+        x=self.pos_encoding(x)
 
         # transformer encoder, [seq, batch, feat]
         x=x.permute(1,0,2)
@@ -106,7 +108,7 @@ class MnistTransformer(nn.Module):
         return x
 
 # hyper param
-d_model=28
+d_model=128
 num_heads=1
 
 # model
@@ -131,6 +133,7 @@ def train():
     for epoch in range(n_epochs):
         n_total=0
         n_correct=0
+        print('====================================')
         for idx, (samples, labels) in enumerate(train_loader):
             # print(f"len(samples):{len(samples)}, {samples.shape}")
             # print(f"len(labels):{len(labels)}, {labels.shape}")
