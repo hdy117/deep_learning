@@ -33,7 +33,7 @@ class YOLO_V1_Transfer(nn.Module):
             nn.Linear(512*7*7, 4096),
             nn.BatchNorm1d(4096),
             nn.ReLU(inplace=True),
-            nn.Linear(2048, 4096),
+            nn.Linear(4096, 4096),
             nn.BatchNorm1d(4096),
             nn.ReLU(inplace=True),
             nn.Dropout(0.2),
