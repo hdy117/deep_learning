@@ -16,9 +16,9 @@ g_file_path=os.path.dirname(os.path.abspath(__file__))
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # hyper parameters
-learning_rate=0.01
-n_epochs = 5
-batch_size=512
+learning_rate=0.001
+n_epochs = 15
+batch_size=128
 img_size=28
 out_dim=10
 torch_model_path=os.path.join(g_file_path,".","model.pth")
@@ -64,39 +64,32 @@ class MnistTransformer(nn.Module):
         self.seq_length=seq_length
         self.feat_dim=feat_dim
 
-        # q/k embeding
+        # transformer
         self.x_embeding=nn.Linear(in_features=self.feat_dim, out_features=d_model)
-
-        # positional encoding
-        self.pos_encoding=RoPE.RotaryPositionalEncoding(dim=d_model)
-
-        # transformer encoder
-        self.transformer_encoder=nn.TransformerEncoder(nn.TransformerEncoderLayer(d_model=d_model, nhead=num_heads),num_layers=num_layers)
+        self.pos_encoding=RoPE.RotaryPositionalEncoding(dim=d_model)  
+        self.transformer_encoder=nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(d_model=d_model, nhead=num_heads),num_layers=num_layers
+        )
 
         # mapping feature to 10 at the end
         self.fc = nn.Sequential(
-            nn.Linear(d_model, 1024),
+            nn.Linear(d_model, 512),
             nn.ReLU(),
-            nn.Linear(1024,1024),
+            nn.Linear(512,512),
             nn.ReLU(),
-            nn.Linear(1024, num_classes),
-            nn.Sigmoid()
+            nn.Linear(512, num_classes),
         )
 
     def forward(self, x):
         N, C, H, W = x.shape    # [512,1,28,28]
 
         # convert input to [batch, seq, feat]
-        x=x.contiguous().view(N,H,W)
+        x=x.contiguous().view(N,H,W) # # [batch, seq, feat]
 
-        # embeding
-        x=self.x_embeding(x)
-
-        # positional encoding
+        # transformer
+        x=self.x_embeding(x) # [batch, seq, feat]
         x=self.pos_encoding(x)
-
-        # transformer encoder, [seq, batch, feat]
-        x=x.permute(1,0,2)
+        x=x.permute(1,0,2) # [seq, batch, feat]
         x = self.transformer_encoder(x)
 
         # take the last output of the sequence
@@ -108,7 +101,7 @@ class MnistTransformer(nn.Module):
         return x
 
 # hyper param
-d_model=128
+d_model=512
 num_heads=1
 
 # model
@@ -122,7 +115,7 @@ def train():
     criterion = nn.CrossEntropyLoss()
 
     # optimizer
-    optimizer = torch.optim.Adam(mnist_transofmer.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(mnist_transofmer.parameters(), lr=learning_rate, weight_decay=5e-4)
 
     # load torch model
     if os.path.exists(torch_model_path):
@@ -155,7 +148,7 @@ def train():
             optimizer.zero_grad()
 
             # accuracy
-            if idx%10==0:
+            if idx%50==0:
                 _, predicted_indices = torch.max(y_pred, dim=1)
                 n_total += y_pred.shape[0]
                 n_correct += (predicted_indices == labels).sum().item()
@@ -186,6 +179,7 @@ def test():
             n_correct+=(y_pred_idx==label).sum().item()
             n_total+=sample.shape[0]
 
+        print("=======================================")
         print(f'accuracy:{n_correct/n_total}, n_total:{n_total}, n_correct:{n_correct}')
 
 

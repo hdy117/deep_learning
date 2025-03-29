@@ -25,7 +25,7 @@ class RotaryPositionalEncoding(nn.Module):
         emb = torch.cat((freqs, freqs), dim=-1)
         cos = emb.cos()
         sin = emb.sin()
-        return self.apply_rotary_pos_emb(x, cos, sin)
+        return self.apply_rotary_pos_emb(x, cos, sin)+x
 
 
 if __name__ == "__main__":
