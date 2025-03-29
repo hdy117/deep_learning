@@ -18,14 +18,14 @@ class RotaryPositionalEncoding(nn.Module):
         x_embed = (x * cos) + (rotate_half(x) * sin)
         return x_embed
 
-    def forward(self, q, k):
-        seq_len=q.shape[-2] # get seq length
+    def forward(self, x):
+        seq_len=x.shape[-2] # get seq length
         t = torch.arange(seq_len, device=self.inv_freq.device).type_as(self.inv_freq)
         freqs = torch.einsum('i,j->ij', t, self.inv_freq)
         emb = torch.cat((freqs, freqs), dim=-1)
         cos = emb.cos()
         sin = emb.sin()
-        return self.apply_rotary_pos_emb(q, cos, sin), self.apply_rotary_pos_emb(k, cos, sin)
+        return self.apply_rotary_pos_emb(x, cos, sin)
 
 
 if __name__ == "__main__":
@@ -38,6 +38,6 @@ if __name__ == "__main__":
     q = torch.randn(256, seq_len, dim)
     k = torch.randn(256, seq_len, dim)
 
-    q_embed, k_embed= rotary_encoding(q, k)
+    q_embed, k_embed= rotary_encoding(q), rotary_encoding(k)
     print("Encoded query shape:", q_embed.shape)
     print("Encoded key shape:", k_embed.shape)

@@ -58,78 +58,61 @@ from torch import nn
 from torchvision import datasets, transforms
 import RoPE
 
-class ViT(nn.Module):
-    def __init__(self, img_width, img_channels, patch_size, d_model, num_heads, num_layers, num_classes, ff_dim):
-        super().__init__()
+class MnistTransformer(nn.Module):
+    def __init__(self, d_model=1024, num_heads=4, num_layers=3, seq_length=28, feat_dim=28, num_classes=10):
+        super().__init__()  
+        self.seq_length=seq_length
+        self.feat_dim=feat_dim
 
-        self.patch_size = patch_size
+        # q/k embeding
+        self.x_embeding=nn.Linear(in_features=self.feat_dim, out_features=d_model)
 
-        # given 7x7 flattened patch, map it into an embedding
-        self.patch_embedding = nn.Linear(img_channels * patch_size * patch_size, d_model)
+        # positional encoding
+        self.pos_encoding=RoPE.RotaryPositionalEncoding(dim=d_model)
 
-        # cls_token we are using we will be concatenating
-        self.cls_token = nn.Parameter(torch.randn(1, 1, d_model))
+        # transformer encoder
+        self.transformer_encoder=nn.TransformerEncoder(nn.TransformerEncoderLayer(d_model=d_model, nhead=num_heads),num_layers=num_layers)
 
-        # (1, 4*4 + 1, 64)
-        # + 1 because we add cls tokens
-        self.RoPE=RoPE.RotaryPositionalEncoding(d_model)
-
-        self.position_embedding = nn.Parameter(
-            torch.rand(1, (img_width // patch_size) * (img_width // patch_size) + 1, d_model)
-        )
-
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model, nhead=num_heads, dim_feedforward=ff_dim, batch_first=True
-        )
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-
-        # mapping 64 to 10 at the end
+        # mapping feature to 10 at the end
         self.fc = nn.Sequential(
-            nn.Linear(d_model, d_model),
+            nn.Linear(d_model, 1024),
             nn.ReLU(),
-            nn.Linear(d_model, num_classes)
+            nn.Linear(1024, num_classes),
+            nn.Sigmoid()
         )
 
     def forward(self, x):
-        N, C, H, W = x.shape
+        N, C, H, W = x.shape    # [512,1,28,28]
 
-        # we divide the image into 4 different 7x7 patches, and then flatten those patches
-        # img shape will be 4*4 x 7*7
-        x = x.unfold(2, self.patch_size, self.patch_size).unfold(3, self.patch_size, self.patch_size)
-        x = x.contiguous().view(N, C, -1, self.patch_size, self.patch_size)
-        x = x.permute(0, 2, 3, 4, 1).contiguous().view(N, -1, C * self.patch_size * self.patch_size)
+        # convert input to [batch, seq, feat]
+        x=x.contiguous().view(N,H,W)
 
-        # each 7*7 flatten patch will be embedded to 64 dim vector
-        x = self.patch_embedding(x)
+        # embeding
+        # x=self.x_embeding(x)
 
-        # cls tokens concatenated after repeating it for the batch
-        cls_tokens = self.cls_token.repeat(N, 1, 1)
-        x = torch.cat((cls_tokens, x), dim=1)
+        # positional encoding
+        # x=self.pos_encoding(x)
 
-        # learnable position embeddings added
-        x = x + self.position_embedding
-
-        # transformer takes 17x64 tensor, like it is a sequence with 17 words (17 because 4*4 + 1 from cls)
+        # transformer encoder, [seq, batch, feat]
+        x=x.permute(1,0,2)
         x = self.transformer_encoder(x)
 
-        # only taking the transformed output of the cls token
-        x = x[:, 0]
+        # take the last output of the sequence
+        x = x[-1]
 
         # mapping to number of classes
         x = self.fc(x)
 
         return x
 
-
-# transformer parameter
-embedding_dim=64
-num_heads=4
-num_layers=3
+# hyper param
+d_model=28
+num_heads=1
 
 # model
-vit=ViT(img_width=28,img_channels=1,patch_size=7, d_model=embedding_dim, \
-    num_heads=num_heads, num_layers=num_layers, num_classes=10, ff_dim=2048)
-vit=vit.to(device)
+mnist_transofmer=MnistTransformer(d_model=d_model, num_heads=num_heads, num_layers=5, \
+    seq_length=28, feat_dim=28, num_classes=10)
+mnist_transofmer=mnist_transofmer.to(device)
 
 # define train
 def train():
@@ -137,12 +120,12 @@ def train():
     criterion = nn.CrossEntropyLoss()
 
     # optimizer
-    optimizer = torch.optim.Adam(vit.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(mnist_transofmer.parameters(), lr=learning_rate)
 
     # load torch model
     if os.path.exists(torch_model_path):
-        vit.load_state_dict(torch.load(torch_model_path))
-        vit.train()
+        mnist_transofmer.load_state_dict(torch.load(torch_model_path))
+        mnist_transofmer.train()
 
     # train
     for epoch in range(n_epochs):
@@ -156,7 +139,7 @@ def train():
             labels=labels.to(device)
 
             # prediction
-            y_pred = vit.forward(samples)
+            y_pred = mnist_transofmer.forward(samples)
 
             # loss
             loss=criterion(y_pred,labels)
@@ -173,26 +156,28 @@ def train():
                 _, predicted_indices = torch.max(y_pred, dim=1)
                 n_total += y_pred.shape[0]
                 n_correct += (predicted_indices == labels).sum().item()
+                print(f'predicted_indices[0]:{predicted_indices[0]}, labels[0]:{labels[0]}')
                 print(f'Epoch {epoch + 1}, Step {idx}, accuracy:{n_correct / n_total}, n_total:{n_total}, n_correct:{n_correct}')
         
         # save model
-        torch.save(vit.state_dict(), torch_model_path)
+        torch.save(mnist_transofmer.state_dict(), torch_model_path)
                 
 def test():
     n_total=0
     n_correct=0
 
     # load model from file
-    vit=ViT(img_width=28,img_channels=1,patch_size=7, d_model=embedding_dim, num_heads=num_heads, num_layers=num_layers, num_classes=10, ff_dim=2048)
-    vit.load_state_dict(torch.load(torch_model_path))
-    vit=vit.to(device)
-    vit.eval()
+    mnist_transofmer=MnistTransformer(d_model=d_model, num_heads=num_heads, num_layers=5, \
+        seq_length=28, feat_dim=28, num_classes=10)
+    mnist_transofmer.load_state_dict(torch.load(torch_model_path))
+    mnist_transofmer=mnist_transofmer.to(device)
+    mnist_transofmer.eval()
 
     with torch.no_grad():
         for idx, (sample,label) in enumerate(test_loader):
             sample=sample.to(device)
             label=label.to(device)
-            y_pred=vit.forward(sample)
+            y_pred=mnist_transofmer.forward(sample)
 
             _, y_pred_idx=torch.max(y_pred,dim=1)
             n_correct+=(y_pred_idx==label).sum().item()
