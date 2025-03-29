@@ -29,17 +29,15 @@ class YOLO_V1_Transfer(nn.Module):
         # 全连接层
         self.fc = nn.Sequential(
             nn.BatchNorm1d(512*7*7),
-            nn.LeakyReLU(inplace=True),
+            nn.ReLU(inplace=True),
+            nn.Linear(512*7*7, 4096),
+            nn.BatchNorm1d(4096),
+            nn.ReLU(inplace=True),
+            nn.Linear(2048, 4096),
+            nn.BatchNorm1d(4096),
+            nn.ReLU(inplace=True),
             nn.Dropout(0.2),
-            nn.Linear(512*7*7, 2048),
-            nn.BatchNorm1d(2048),
-            nn.LeakyReLU(inplace=True),
-            nn.Dropout(0.2),
-            nn.Linear(2048, 2048),
-            nn.BatchNorm1d(2048),
-            nn.LeakyReLU(inplace=True),
-            nn.Dropout(0.2),
-            nn.Linear(2048, HyperParam.S*HyperParam.S*HyperParam.OUT_DIM),
+            nn.Linear(4096, HyperParam.S*HyperParam.S*HyperParam.OUT_DIM),
             nn.Sigmoid()
         )
 
