@@ -15,42 +15,6 @@ g_file_path=os.path.dirname(os.path.abspath(__file__))
 # device
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# hyper parameters
-learning_rate=0.001
-n_epochs = 15
-batch_size=128
-img_size=28
-out_dim=10
-torch_model_path=os.path.join(g_file_path,".","model.pth")
-
-
-# 定义数据变换
-transform = transforms.Compose([
-    transforms.ToTensor(),  # 将图像转换为torch.Tensor类型，同时将像素值归一化到[0, 1]
-    # transforms.Normalize((0.1307,), (0.3081,))  # 对数据进行归一化，这里的均值和标准差是MNIST数据集的统计值
-])
-
-# 加载训练集
-train_dataset = torchvision.datasets.MNIST(root='./data',  # 数据存储的根目录
-                                           train=True,  # 如果为True，则加载训练集
-                                           download=True,  # 如果数据不存在，则自动下载
-                                           transform=transform)
-
-# 加载测试集
-test_dataset = torchvision.datasets.MNIST(root='./data',
-                                          train=False,  # 如果为False，则加载测试集
-                                          download=True,
-                                          transform=transform)
-
-# 创建数据加载器
-train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
-                                           batch_size=batch_size,  # 每个批次的样本数量
-                                           shuffle=True)  # 是否在每个epoch打乱数据
-
-test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
-                                          batch_size=batch_size,
-                                          shuffle=False)
-
 # 位置编码
 import torch
 import torch.nn.functional as F
@@ -100,13 +64,48 @@ class MnistTransformer(nn.Module):
 
         return x
 
-# hyper param
+# hyper parameters
+learning_rate=0.001
+n_epochs = 15
+batch_size=128
+img_size=28
+out_dim=10
+torch_model_path=os.path.join(g_file_path,".","model.pth")
+
 d_model=512
 num_heads=1
+num_layers=3
+
+# 定义数据变换
+transform = transforms.Compose([
+    transforms.ToTensor(),  # 将图像转换为torch.Tensor类型，同时将像素值归一化到[0, 1]
+    # transforms.Normalize((0.1307,), (0.3081,))  # 对数据进行归一化，这里的均值和标准差是MNIST数据集的统计值
+])
+
+# 加载训练集
+train_dataset = torchvision.datasets.MNIST(root='./data',  # 数据存储的根目录
+                                           train=True,  # 如果为True，则加载训练集
+                                           download=True,  # 如果数据不存在，则自动下载
+                                           transform=transform)
+
+# 加载测试集
+test_dataset = torchvision.datasets.MNIST(root='./data',
+                                          train=False,  # 如果为False，则加载测试集
+                                          download=True,
+                                          transform=transform)
+
+# 创建数据加载器
+train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
+                                           batch_size=batch_size,  # 每个批次的样本数量
+                                           shuffle=True)  # 是否在每个epoch打乱数据
+
+test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
+                                          batch_size=batch_size,
+                                          shuffle=False)
 
 # model
-mnist_transofmer=MnistTransformer(d_model=d_model, num_heads=num_heads, num_layers=5, \
-    seq_length=28, feat_dim=28, num_classes=10)
+mnist_transofmer=MnistTransformer(d_model=d_model, num_heads=num_heads, num_layers=num_layers, \
+    seq_length=img_size, feat_dim=img_size, num_classes=out_dim)
 mnist_transofmer=mnist_transofmer.to(device)
 
 # define train
@@ -163,8 +162,8 @@ def test():
     n_correct=0
 
     # load model from file
-    mnist_transofmer=MnistTransformer(d_model=d_model, num_heads=num_heads, num_layers=5, \
-        seq_length=28, feat_dim=28, num_classes=10)
+    mnist_transofmer=MnistTransformer(d_model=d_model, num_heads=num_heads, num_layers=num_layers, \
+        seq_length=img_size, feat_dim=img_size, num_classes=out_dim)
     mnist_transofmer.load_state_dict(torch.load(torch_model_path))
     mnist_transofmer=mnist_transofmer.to(device)
     mnist_transofmer.eval()
