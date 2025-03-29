@@ -20,7 +20,6 @@ learning_rate=0.01
 n_epochs = 5
 batch_size=512
 img_size=28
-input_size=28*28
 out_dim=10
 torch_model_path=os.path.join(g_file_path,".","model.pth")
 
@@ -57,6 +56,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from torchvision import datasets, transforms
+import RoPE
 
 class ViT(nn.Module):
     def __init__(self, img_width, img_channels, patch_size, d_model, num_heads, num_layers, num_classes, ff_dim):
@@ -72,6 +72,8 @@ class ViT(nn.Module):
 
         # (1, 4*4 + 1, 64)
         # + 1 because we add cls tokens
+        self.RoPE=RoPE.RotaryPositionalEncoding(d_model)
+
         self.position_embedding = nn.Parameter(
             torch.rand(1, (img_width // patch_size) * (img_width // patch_size) + 1, d_model)
         )
@@ -84,7 +86,7 @@ class ViT(nn.Module):
         # mapping 64 to 10 at the end
         self.fc = nn.Sequential(
             nn.Linear(d_model, d_model),
-            nn.LeakyReLU(),
+            nn.ReLU(),
             nn.Linear(d_model, num_classes)
         )
 
@@ -125,7 +127,8 @@ num_heads=4
 num_layers=3
 
 # model
-vit=ViT(img_width=28,img_channels=1,patch_size=7, d_model=embedding_dim, num_heads=num_heads, num_layers=num_layers, num_classes=10, ff_dim=2048)
+vit=ViT(img_width=28,img_channels=1,patch_size=7, d_model=embedding_dim, \
+    num_heads=num_heads, num_layers=num_layers, num_classes=10, ff_dim=2048)
 vit=vit.to(device)
 
 # define train
@@ -136,6 +139,12 @@ def train():
     # optimizer
     optimizer = torch.optim.Adam(vit.parameters(), lr=learning_rate)
 
+    # load torch model
+    if os.path.exists(torch_model_path):
+        vit.load_state_dict(torch.load(torch_model_path))
+        vit.train()
+
+    # train
     for epoch in range(n_epochs):
         n_total=0
         n_correct=0

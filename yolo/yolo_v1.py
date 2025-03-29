@@ -31,9 +31,8 @@ class HyperParam:
     GRID_SIZE=IMG_SIZE//S # size of grid
     BBOX_SIZE=int(4)
     CONFIDENT_SIZE=int(1) 
-    # NUM_CLASS=int(90)
-    NUM_CLASS=int(3)
-    TARGET_CLASS_LABELS=coco_dataset.coco_3_categories # [person,bicycle,car]
+    TARGET_CLASS_LABELS=coco_dataset.coco_10_categories # coco_3_categories # [person,bicycle,car]
+    NUM_CLASS=max(TARGET_CLASS_LABELS)
     OUT_DIM=int(NUM_CLASS+BBOX_SIZE+CONFIDENT_SIZE) # output dim, NUM_CLASS+BBOX_SIZE+CONFIDENT_SIZE
 
 # 1. prepare dataset

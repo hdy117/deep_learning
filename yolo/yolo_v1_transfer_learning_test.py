@@ -14,8 +14,8 @@ val_dataset=COCODataset(coco_dataset.coco_val_img_dir,
                         coco_dataset.coco_val_annotation_file,
                         img_new_size=HyperParam.IMG_SIZE,
                         transform=HyperParam.transform,
-                        target_class=[3],augmentation=False)
-                        # target_class=HyperParam.TARGET_CLASS_LABELS)
+                        target_class=HyperParam.TARGET_CLASS_LABELS,
+                        augmentation=False)
 val_data_loader=DataLoader(dataset=val_dataset, 
                            shuffle=False, 
                            batch_size=HyperParam.batch_size)
