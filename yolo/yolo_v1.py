@@ -38,11 +38,12 @@ class HyperParam:
 
 # 1. prepare dataset
 class COCODataset(Dataset):
-    def __init__(self, img_folder, anno_file_path, img_new_size=HyperParam.IMG_SIZE, transform=None, target_class=coco_dataset.coco_3_categories):
+    def __init__(self, img_folder, anno_file_path, img_new_size=HyperParam.IMG_SIZE, transform=None, \
+        target_class=coco_dataset.coco_3_categories, augmentation=True):
         super().__init__()
         self.transform=transform
         self.img_new_size=img_new_size
-        self.coco_parser=coco_dataset.COCOParser(img_dir=img_folder, annotation_file=anno_file_path)
+        self.coco_parser=coco_dataset.COCOParser(img_dir=img_folder, annotation_file=anno_file_path,execlusive_category_id=1,augmentation=augmentation)
         self.coco_parser.set_target_category_id(target_category_ids=target_class)
         self.img_infos=self.coco_parser.get_img_infos()
 

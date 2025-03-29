@@ -13,12 +13,12 @@ from dataset import coco_dataset
 
 # coco dataset
 class COCODataset(Dataset):
-    def __init__(self, img_folder, anno_file_path, img_new_size=224, target_class:list=coco_dataset.coco_10_categories, transform=None):
+    def __init__(self, img_folder, anno_file_path, img_new_size=224, target_class:list=coco_dataset.coco_10_categories, transform=None, augmentation=True):
         super().__init__()
         self.transform=transform
         self.target_class=target_class
         self.img_new_size=img_new_size
-        self.coco_parser=coco_dataset.COCOParser(img_dir=img_folder, annotation_file=anno_file_path)
+        self.coco_parser=coco_dataset.COCOParser(img_dir=img_folder, annotation_file=anno_file_path, execlusive_category_id=1,augmentation=augmentation)
         self.coco_parser.set_target_category_id(target_category_ids=target_class)
         self.img_infos=self.coco_parser.get_img_infos()
 

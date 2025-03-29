@@ -20,7 +20,7 @@ resnet_base.target_class=coco_dataset.coco_10_categories # coco_9_in_10_catetgor
 resnet_base.lr=0.0001
 resnet_base.batch_size=128
 resnet_base.n_epoch=10
-resnet_base.lr_step_size=resnet_base.n_epoch//1
+resnet_base.lr_step_size=resnet_base.n_epoch//2
 
 # train dataloader
 train_dataset=resnet_base.COCODataset(coco_dataset.coco_train_img_dir,

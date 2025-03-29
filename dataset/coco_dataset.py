@@ -82,7 +82,7 @@ class ImgLabelResize:
         return [x,y,width,height]
 
 class COCOParser:
-    def __init__(self, img_dir=coco_train_img_dir, annotation_file=coco_train_annotation_file,execlusive_category_id=1):
+    def __init__(self, img_dir=coco_train_img_dir, annotation_file=coco_train_annotation_file,execlusive_category_id=1,augmentation=True):
         '''
         {
             "images": [
@@ -138,6 +138,7 @@ class COCOParser:
         self.coco:COCO=COCO(annotation_file)
         self.target_category_ids:list[int]=[id for id in range(1,91)]
         self.execlusive_category_id=execlusive_category_id
+        self.augmentation=augmentation
 
         # set target category ids
         self.set_target_category_id(self.target_category_ids)
@@ -157,9 +158,19 @@ class COCOParser:
             anno_infos=self.get_annotation_infos_by_img_id(img_id)
             for anno_info in anno_infos:
                 if anno_info['category_id'] in self.target_category_ids:
+                   if not self.augmentation:
+                    filter_img_ids.append(img_id)
                    category_maps[anno_info['category_id']].append(img_id)
                    continue
+        
+        if not self.augmentation:
+            # get img infos and return without data agumentation   
+            filter_img_ids=list(set(filter_img_ids))     
+            img_infos=self.coco.loadImgs(filter_img_ids)
+            print(f'target_category_ids:{self.target_category_ids}, img number:{len(img_infos)}')
+            return img_infos
 
+        # continue data augmentation
         # set of category_maps
         max_num_of_id=0
         for category_id in category_maps.keys():
