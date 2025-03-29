@@ -54,11 +54,11 @@ class YOLO_V1_Transfer(nn.Module):
         return pred_class, pred_coord, pred_conf
     
 # hyper param
-HyperParam.learning_rate=0.0001
+HyperParam.learning_rate=0.0002
 HyperParam.weight_decay=0.0005
 HyperParam.batch_size=512
-HyperParam.n_epoch=5
-HyperParam.lr_step_size=HyperParam.n_epoch//1
+HyperParam.n_epoch=20
+HyperParam.lr_step_size=HyperParam.n_epoch//2
 
 # train dataloader
 train_dataset=yolo_v1.COCODataset(coco_dataset.coco_train_img_dir,
