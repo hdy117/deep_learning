@@ -13,7 +13,7 @@ g_file_path=os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(g_file_path,'..'))
 
 from dataset import cifar10_dataset
-from transformer_encoder import TransEncoder
+import RoPE
 
 # device
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -25,39 +25,52 @@ class CIFAR10_ViT(nn.Module):
         self.img_h=img_size[1]
         self.img_channel=img_channel
         
-        self.path_size=patch_size   # row/column of a patch
-        self.patch_num=self.img_channel*self.img_w//self.path_size*self.img_h//self.path_size # total patch number
-        self.path_pixel_num=self.path_size*self.path_size # pixel number in a patch
-        self.num_classes=num_classes    # number of class
+        self.path_size=patch_size   # row/column of a patch, 8
+        self.patch_num=self.img_channel*self.img_w//self.path_size*self.img_h//self.path_size # total patch number, 3*4*4-->48
+        self.patch_pixel_num=self.path_size*self.path_size # pixel number in a patch, 8*8-->64
+        self.num_classes=num_classes    # number of class, 10
+        self.d_model=768
         
-        self.tran_encoder=nn.Sequential(
-            TransEncoder(feat_dim=self.path_pixel_num,d_model=768,num_heads=4,num_layers=3),
-            TransEncoder(feat_dim=768,d_model=768,num_heads=4,num_layers=3),
-            TransEncoder(feat_dim=768,d_model=1024,num_heads=4,num_layers=3),
+        self.class_token = nn.Parameter(torch.randn(1, 1, self.d_model))  # 添加分类标记
+        
+        self.embedding = nn.Linear(self.patch_pixel_num, self.d_model)   # embedding
+        self.RoPE=RoPE.RotaryPositionalEncoding(dim=self.d_model)
+        self.transfomer_encoder=nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=8, batch_first=True),
+            num_layers=12
         )
 
         # mapping feature to 10 at the end
         self.fc = nn.Sequential(
-            nn.Linear(1024, 1024),
+            nn.Linear(768, 768),
             nn.ReLU(),
-            nn.Linear(1024,1024),
+            nn.Dropout(0.2),
+            nn.Linear(768,768),
             nn.ReLU(),
-            nn.Linear(1024, self.num_classes),
+            nn.Dropout(0.2),
+            nn.Linear(768, self.num_classes),
         )
 
     def forward(self, x:torch.Tensor):
-        N, C, H, W = x.shape    # [512,1,28,28]
+        N, C, H, W = x.shape    # [512,3,32,32]
 
         # convert input to [batch, seq, feat]
         x=x.unfold(3,self.path_size,self.path_size).unfold(4,self.path_size,self.path_size)
+        x=x.contiguous().view(N,self.patch_num,self.patch_pixel_num) # # [batch, seq, feat]
         
-        x=x.contiguous().view(N,self.patch_num,self.path_pixel_num) # # [batch, seq, feat]
-
+        # embedding and positional encoding
+        x=self.embedding(x) # self.patch_pixel_num --> d_model
+        x=self.RoPE(x)
+        
+        # add class token to capture global information
+        class_tokens = self.class_token.expand(x.size(0), -1, -1)  # 扩展分类标记到批次大小
+        x = torch.cat((class_tokens, x), dim=1)  # 将分类标记与图像块特征拼接
+        
         # transformer encoder
-        x = self.tran_encoder(x)
+        x=self.transfomer_encoder(x)
 
         # take the last output of the sequence
-        x = x[:,-1,:].squeeze(1)
+        x = x[:,0,:].squeeze(1)
 
         # mapping to number of classes
         x = self.fc(x)
@@ -168,7 +181,7 @@ def test():
 
             _, y_pred_idx=torch.max(y_pred,dim=1)
             _, label_idx=torch.max(label,dim=1)
-            n_correct+=(y_pred_idx==label).sum().item()
+            n_correct+=(y_pred_idx==label_idx).sum().item()
             n_total+=sample.shape[0]
 
         print("=======================================")
