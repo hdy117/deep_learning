@@ -67,7 +67,7 @@ class CustomCIFAR10Dataset(Dataset):
 # 定义数据变换
 transform = transforms.Compose([
     transforms.ToPILImage(),
-    transforms.Resize((Image_Size,Image_Size)),
+    # transforms.Resize((Image_Size,Image_Size)),
     transforms.ToTensor(),
     # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
 ])
@@ -89,6 +89,7 @@ def show_img(image, label):
     image = image.numpy().transpose(1, 2, 0)  # 将通道维度移到最后
     # image = image * std + mean
     image = np.clip(image, 0, 1)  # 确保像素值在[0, 1]之间
+    print(f'image.shape:{image.shape}')
 
     # 显示图像
     plt.imshow(image)
