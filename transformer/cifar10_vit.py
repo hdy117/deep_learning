@@ -19,15 +19,15 @@ import RoPE
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class CIFAR10_ViT(nn.Module):
-    def __init__(self,img_channel:int=3,img_size=[32,32], patch_size:int=8, num_classes=10):
+    def __init__(self,img_channel:int=3,img_size=[32,32], patch_size:int=16, num_classes=10):
         super().__init__()  
         self.img_w=img_size[0]
         self.img_h=img_size[1]
         self.img_channel=img_channel
         
         self.path_size=patch_size   # row/column of a patch, 8
-        self.patch_num=(self.img_channel)*(self.img_w//self.path_size)*(self.img_h//self.path_size) # total patch number, 3*4*4-->48
-        self.patch_pixel_num=self.path_size*self.path_size # pixel number in a patch, 8*8-->64
+        self.patch_num=(self.img_channel)*(self.img_w//self.path_size)*(self.img_h//self.path_size) # total patch number, 3*2*2-->12
+        self.patch_pixel_num=self.path_size*self.path_size # pixel number in a patch, 16*16-->256
         self.num_classes=num_classes    # number of class, 10
         self.d_model=768
         
@@ -84,7 +84,7 @@ batch_size=256
 img_size=32
 num_classes=10
 torch_model_path=os.path.join(g_file_path,".","model_cifar10.pth")
-patch_size=8
+patch_size=16
 
 # 定义数据变换
 transform = transforms.Compose([
