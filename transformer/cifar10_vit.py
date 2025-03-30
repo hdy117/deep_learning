@@ -25,9 +25,9 @@ class CIFAR10_ViT(nn.Module):
         self.img_h=img_size[1]
         self.img_channel=img_channel
         
-        self.path_size=patch_size   # row/column of a patch, 8
-        self.patch_num=(self.img_channel)*(self.img_w//self.path_size)*(self.img_h//self.path_size) # total patch number, 3*2*2-->12
-        self.patch_pixel_num=self.path_size*self.path_size # pixel number in a patch, 16*16-->256
+        self.patch_size=patch_size   # row/column of a patch, 8
+        self.patch_num=(self.img_channel)*(self.img_w//self.patch_size)*(self.img_h//self.patch_size) # total patch number, 3*2*2-->12
+        self.patch_pixel_num=self.patch_size*self.patch_size # pixel number in a patch, 16*16-->256
         self.num_classes=num_classes    # number of class, 10
         self.d_model=self.patch_pixel_num*4
         
@@ -47,6 +47,9 @@ class CIFAR10_ViT(nn.Module):
             nn.Linear(self.d_model, 4096),
             nn.ReLU(),
             nn.Dropout(0.1),
+            nn.Linear(4096, 4096),
+            nn.ReLU(),
+            nn.Dropout(0.1),
             nn.Linear(4096, self.num_classes),
         )
 
@@ -54,22 +57,21 @@ class CIFAR10_ViT(nn.Module):
         N, C, H, W = x.shape    # [512,3,32,32]
 
         # convert input to [batch, seq, feat]
-        x=x.unfold(3,self.path_size,self.path_size).unfold(4,self.path_size,self.path_size)
+        x=x.unfold(3,self.patch_size,self.patch_size).unfold(4,self.patch_size,self.patch_size)
         x=x.contiguous().view(N,self.patch_num,self.patch_pixel_num) # # [batch, seq, feat]
         
         # embedding and positional encoding
         x=self.embedding(x) # self.patch_pixel_num --> d_model
-        
+        # x=self.RoPE(x)  # positional encoding
         class_tokens = self.class_token.expand(x.size(0), -1, -1) # add class token to capture global information
         x = torch.cat((class_tokens, x), dim=1)  # concat class_token and embedding
-        
         x=self.RoPE(x)  # positional encoding
         
         # transformer encoder
         x=self.transfomer_encoder(x)
 
         # take class token to predict
-        x = x[:,0,:].squeeze(1)
+        x = x[:,0,:]
 
         # mapping to number of classes
         x = self.fc(x)
@@ -77,8 +79,8 @@ class CIFAR10_ViT(nn.Module):
         return x
 
 # hyper parameters
-learning_rate=5e-4
-n_epochs=30
+learning_rate=1e-3
+n_epochs=60
 lr_step_size=n_epochs//3
 batch_size=128
 img_size=32
