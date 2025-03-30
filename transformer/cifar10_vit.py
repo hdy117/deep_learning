@@ -5,22 +5,18 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 import torchvision
 from torchvision.transforms import transforms
-import os
+import os,sys
 import matplotlib.pyplot as plt
-import json
 
 # global file path
 g_file_path=os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(g_file_path,'..'))
+
+from dataset import cifar10_dataset
+from transformer_encoder import TransEncoder
 
 # device
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-# 位置编码
-import torch
-import torch.nn.functional as F
-from torch import nn
-from torchvision import datasets, transforms
-from transformer_encoder import TransEncoder
 
 class CIFAR10_ViT(nn.Module):
     def __init__(self,img_channel:int=3,img_size=[32,32], patch_size:int=4, num_classes=10):
@@ -34,8 +30,8 @@ class CIFAR10_ViT(nn.Module):
         self.path_pixel_num=self.path_size*self.path_size # pixel number in a patch
         self.num_classes=num_classes    # number of class
         
-        self.tran_encoder=nn.Transformer(
-            TransEncoder(feat_dim=64,d_model=768,num_heads=4,num_layers=3),
+        self.tran_encoder=nn.Sequential(
+            TransEncoder(feat_dim=self.path_pixel_num,d_model=768,num_heads=4,num_layers=3),
             TransEncoder(feat_dim=768,d_model=768,num_heads=4,num_layers=3),
             TransEncoder(feat_dim=768,d_model=1024,num_heads=4,num_layers=3),
         )
@@ -71,10 +67,11 @@ class CIFAR10_ViT(nn.Module):
 # hyper parameters
 learning_rate=0.001
 n_epochs = 10
-batch_size=128
+batch_size=256
 img_size=32
 num_classes=10
 torch_model_path=os.path.join(g_file_path,".","model_cifar10.pth")
+patch_size=8
 
 # 定义数据变换
 transform = transforms.Compose([
@@ -83,16 +80,12 @@ transform = transforms.Compose([
 ])
 
 # 加载训练集
-train_dataset = torchvision.datasets.CIFAR10(root='./data',  # 数据存储的根目录
-                                           train=True,  # 如果为True，则加载训练集
-                                           download=True,  # 如果数据不存在，则自动下载
-                                           transform=transform)
+train_dataset = cifar10_dataset.CustomCIFAR10Dataset(data_dir=cifar10_dataset.data_dir, train=True, \
+    transform=cifar10_dataset.transform_no_resize)
 
 # 加载测试集
-test_dataset = torchvision.datasets.CIFAR10(root='./data',
-                                          train=False,  # 如果为False，则加载测试集
-                                          download=True,
-                                          transform=transform)
+test_dataset = cifar10_dataset.CustomCIFAR10Dataset(data_dir=cifar10_dataset.data_dir, train=False, \
+    transform=cifar10_dataset.transform_no_resize)
 
 # 创建数据加载器
 train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
@@ -104,13 +97,13 @@ test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
                                           shuffle=False)
 
 # model
-cifar10_vit=CIFAR10_ViT(img_channel=3, img_size=[img_size,img_size],patch_size=4,num_classes=num_classes)
+cifar10_vit=CIFAR10_ViT(img_channel=3, img_size=[img_size,img_size],patch_size=patch_size,num_classes=num_classes)
 cifar10_vit=cifar10_vit.to(device)
 
 # define train
 def train():
     # criterion
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.BCEWithLogitsLoss()
 
     # optimizer
     optimizer = torch.optim.Adam(cifar10_vit.parameters(), lr=learning_rate, weight_decay=5e-4)
@@ -161,7 +154,7 @@ def test():
     n_correct=0
 
     # load model from file
-    cifar10_vit=CIFAR10_ViT(img_channel=3, img_size=[img_size,img_size],patch_size=4,num_classes=num_classes)
+    cifar10_vit=CIFAR10_ViT(img_channel=3, img_size=[img_size,img_size],patch_size=patch_size,num_classes=num_classes)
     cifar10_vit.load_state_dict(torch.load(torch_model_path))
     cifar10_vit=cifar10_vit.to(device)
     cifar10_vit.eval()
@@ -182,7 +175,7 @@ def test():
 
 if __name__ =="__main__":
     img, label=train_dataset[34]
-    img=img.reshape(28,28)
+    img=img.permute(1,2,0)
     print(f'img.shape:{img.shape}, img type:{type(img)}, label.shape:{label}, label.type:{type(label)}')
     plt.imshow(img)
     plt.title(f'{label}')

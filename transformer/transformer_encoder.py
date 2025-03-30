@@ -5,7 +5,7 @@ import RoPE
 
 class TransEncoder(nn.Module):
     def __init__(self, feat_dim:int=64, d_model:int=768, num_heads:int=4, num_layers:int=3):
-        super().__init()
+        super().__init__()
         self.feat_dim=feat_dim
         self.d_model=d_model
         self.num_heads=num_heads
