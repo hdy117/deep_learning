@@ -26,7 +26,7 @@ class CIFAR10_ViT(nn.Module):
         self.img_channel=img_channel
         
         self.path_size=patch_size   # row/column of a patch, 8
-        self.patch_num=self.img_channel*self.img_w//self.path_size*self.img_h//self.path_size # total patch number, 3*4*4-->48
+        self.patch_num=(self.img_channel)*(self.img_w//self.path_size)*(self.img_h//self.path_size) # total patch number, 3*4*4-->48
         self.patch_pixel_num=self.path_size*self.path_size # pixel number in a patch, 8*8-->64
         self.num_classes=num_classes    # number of class, 10
         self.d_model=768
@@ -36,7 +36,7 @@ class CIFAR10_ViT(nn.Module):
         self.embedding = nn.Linear(self.patch_pixel_num, self.d_model)   # embedding
         self.RoPE=RoPE.RotaryPositionalEncoding(dim=self.d_model)
         self.transfomer_encoder=nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=8, batch_first=True),
+            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=12, batch_first=True),
             num_layers=12
         )
 
@@ -60,7 +60,7 @@ class CIFAR10_ViT(nn.Module):
         
         # embedding and positional encoding
         x=self.embedding(x) # self.patch_pixel_num --> d_model
-        x=self.RoPE(x)
+        x=self.RoPE(x)  # positional encoding
         
         # add class token to capture global information
         class_tokens = self.class_token.expand(x.size(0), -1, -1)  # 扩展分类标记到批次大小
