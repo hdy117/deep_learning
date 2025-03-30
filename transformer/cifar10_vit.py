@@ -44,13 +44,13 @@ class CIFAR10_ViT(nn.Module):
         self.fc = nn.Sequential(
             nn.BatchNorm1d(self.d_model),
             nn.ReLU(),
-            nn.Linear(768, 768),
+            nn.Linear(self.d_model, 1024),
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(768,768),
+            nn.Linear(1024,1024),
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(768, self.num_classes),
+            nn.Linear(1024, self.num_classes),
         )
 
     def forward(self, x:torch.Tensor):
@@ -148,7 +148,7 @@ def train():
             optimizer.zero_grad()
 
             # accuracy
-            if idx%10==0:
+            if idx%100==0:
                 _, predicted_indices = torch.max(y_pred, dim=1)
                 _, label_indices = torch.max(labels, dim=1)
                 n_total += y_pred.shape[0]
