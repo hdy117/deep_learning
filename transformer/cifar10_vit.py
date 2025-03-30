@@ -84,7 +84,7 @@ lr_step_size=n_epochs//2
 batch_size=128
 img_size=32
 num_classes=10
-torch_model_path=os.path.join(g_file_path,".","model_cifar10.pth")
+torch_model_path=os.path.join(g_file_path,".","ViT_cifar10.pth")
 patch_size=16
 
 # 定义数据变换

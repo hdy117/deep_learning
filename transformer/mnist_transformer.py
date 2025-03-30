@@ -70,7 +70,7 @@ n_epochs = 15
 batch_size=128
 img_size=28
 out_dim=10
-torch_model_path=os.path.join(g_file_path,".","model.pth")
+torch_model_path=os.path.join(g_file_path,".","model_mnist.pth")
 
 d_model=512
 num_heads=1
