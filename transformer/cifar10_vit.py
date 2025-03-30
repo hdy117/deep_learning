@@ -69,7 +69,7 @@ class CIFAR10_ViT(nn.Module):
         # transformer encoder
         x=self.transfomer_encoder(x)
 
-        # take the last output of the sequence
+        # take class token to predict
         x = x[:,0,:].squeeze(1)
 
         # mapping to number of classes
