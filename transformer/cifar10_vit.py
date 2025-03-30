@@ -19,7 +19,7 @@ from transformer_encoder import TransEncoder
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class CIFAR10_ViT(nn.Module):
-    def __init__(self,img_channel:int=3,img_size=[32,32], patch_size:int=4, num_classes=10):
+    def __init__(self,img_channel:int=3,img_size=[32,32], patch_size:int=8, num_classes=10):
         super().__init__()  
         self.img_w=img_size[0]
         self.img_h=img_size[1]
@@ -57,7 +57,7 @@ class CIFAR10_ViT(nn.Module):
         x = self.tran_encoder(x)
 
         # take the last output of the sequence
-        x = x[-1]
+        x = x[:,-1,:].squeeze(1)
 
         # mapping to number of classes
         x = self.fc(x)
@@ -141,9 +141,10 @@ def train():
             # accuracy
             if idx%50==0:
                 _, predicted_indices = torch.max(y_pred, dim=1)
+                _, label_indices = torch.max(labels, dim=1)
                 n_total += y_pred.shape[0]
-                n_correct += (predicted_indices == labels).sum().item()
-                print(f'predicted_indices[0]:{predicted_indices[0]}, labels[0]:{labels[0]}')
+                n_correct += (predicted_indices == label_indices).sum().item()
+                print(f'predicted_indices[0]:{predicted_indices[0]}, labels[0]:{label_indices[0]}')
                 print(f'Epoch {epoch + 1}, Step {idx}, accuracy:{n_correct / n_total}, n_total:{n_total}, n_correct:{n_correct}')
         
         # save model
@@ -166,6 +167,7 @@ def test():
             y_pred=cifar10_vit.forward(sample)
 
             _, y_pred_idx=torch.max(y_pred,dim=1)
+            _, label_idx=torch.max(label,dim=1)
             n_correct+=(y_pred_idx==label).sum().item()
             n_total+=sample.shape[0]
 
