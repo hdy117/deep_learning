@@ -29,14 +29,14 @@ class CIFAR10_ViT(nn.Module):
         self.patch_num=(self.img_channel)*(self.img_w//self.path_size)*(self.img_h//self.path_size) # total patch number, 3*2*2-->12
         self.patch_pixel_num=self.path_size*self.path_size # pixel number in a patch, 16*16-->256
         self.num_classes=num_classes    # number of class, 10
-        self.d_model=768
+        self.d_model=1024
         
         self.class_token = nn.Parameter(torch.randn(1, 1, self.d_model))  # 添加分类标记
         
         self.embedding = nn.Linear(self.patch_pixel_num, self.d_model)   # embedding
         self.RoPE=RoPE.RotaryPositionalEncoding(dim=self.d_model)
         self.transfomer_encoder=nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=12, batch_first=True),
+            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=16, batch_first=True),
             num_layers=12
         )
 
@@ -44,13 +44,13 @@ class CIFAR10_ViT(nn.Module):
         self.fc = nn.Sequential(
             nn.BatchNorm1d(self.d_model),
             nn.ReLU(),
-            nn.Linear(self.d_model, 1024),
+            nn.Linear(self.d_model, 2048),
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(1024,1024),
+            nn.Linear(2048,2048),
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(1024, self.num_classes),
+            nn.Linear(2048, self.num_classes),
         )
 
     def forward(self, x:torch.Tensor):
@@ -62,9 +62,11 @@ class CIFAR10_ViT(nn.Module):
         
         # embedding and positional encoding
         x=self.embedding(x) # self.patch_pixel_num --> d_model
-        x=self.RoPE(x)  # positional encoding
+        
         class_tokens = self.class_token.expand(x.size(0), -1, -1) # add class token to capture global information
         x = torch.cat((class_tokens, x), dim=1)  # concat class_token and embedding
+        
+        x=self.RoPE(x)  # positional encoding
         
         # transformer encoder
         x=self.transfomer_encoder(x)
@@ -148,11 +150,11 @@ def train():
             optimizer.zero_grad()
 
             # accuracy
+            _, predicted_indices = torch.max(y_pred, dim=1)
+            _, label_indices = torch.max(labels, dim=1)
+            n_total += y_pred.shape[0]
+            n_correct += (predicted_indices == label_indices).sum().item()
             if idx%100==0:
-                _, predicted_indices = torch.max(y_pred, dim=1)
-                _, label_indices = torch.max(labels, dim=1)
-                n_total += y_pred.shape[0]
-                n_correct += (predicted_indices == label_indices).sum().item()
                 print(f'predicted_indices[0]:{predicted_indices[0]}, labels[0]:{label_indices[0]}')
                 print(f'Epoch {epoch}, Step {idx}, accuracy:{n_correct / n_total}, n_total:{n_total}, n_correct:{n_correct}')
         
