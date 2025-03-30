@@ -29,14 +29,14 @@ class CIFAR10_ViT(nn.Module):
         self.patch_num=(self.img_channel)*(self.img_w//self.path_size)*(self.img_h//self.path_size) # total patch number, 3*2*2-->12
         self.patch_pixel_num=self.path_size*self.path_size # pixel number in a patch, 16*16-->256
         self.num_classes=num_classes    # number of class, 10
-        self.d_model=1024
+        self.d_model=768
         
         self.class_token = nn.Parameter(torch.randn(1, 1, self.d_model))  # 添加分类标记
         
         self.embedding = nn.Linear(self.patch_pixel_num, self.d_model)   # embedding
         self.RoPE=RoPE.RotaryPositionalEncoding(dim=self.d_model)
         self.transfomer_encoder=nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=16, batch_first=True),
+            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=12, batch_first=True,dim_feedforward=4*self.d_model),
             num_layers=12
         )
 
@@ -44,13 +44,10 @@ class CIFAR10_ViT(nn.Module):
         self.fc = nn.Sequential(
             nn.BatchNorm1d(self.d_model),
             nn.ReLU(),
-            nn.Linear(self.d_model, 2048),
+            nn.Linear(self.d_model, 4096),
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(2048,2048),
-            nn.ReLU(),
-            nn.Dropout(0.1),
-            nn.Linear(2048, self.num_classes),
+            nn.Linear(4096, self.num_classes),
         )
 
     def forward(self, x:torch.Tensor):
