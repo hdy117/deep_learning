@@ -29,15 +29,15 @@ class CIFAR10_ViT(nn.Module):
         self.patch_num=(self.img_channel)*(self.img_w//self.path_size)*(self.img_h//self.path_size) # total patch number, 3*2*2-->12
         self.patch_pixel_num=self.path_size*self.path_size # pixel number in a patch, 16*16-->256
         self.num_classes=num_classes    # number of class, 10
-        self.d_model=768
+        self.d_model=self.patch_pixel_num*4
         
         self.class_token = nn.Parameter(torch.randn(1, 1, self.d_model))  # 添加分类标记
         
         self.embedding = nn.Linear(self.patch_pixel_num, self.d_model)   # embedding
         self.RoPE=RoPE.RotaryPositionalEncoding(dim=self.d_model)
         self.transfomer_encoder=nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=12, batch_first=True,dim_feedforward=4*self.d_model),
-            num_layers=12
+            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=16, batch_first=True,dim_feedforward=4*self.d_model),
+            num_layers=24
         )
 
         # mapping feature to 10 at the end
@@ -78,8 +78,8 @@ class CIFAR10_ViT(nn.Module):
 
 # hyper parameters
 learning_rate=5e-4
-n_epochs=20
-lr_step_size=n_epochs//2
+n_epochs=30
+lr_step_size=n_epochs//3
 batch_size=128
 img_size=32
 num_classes=10
