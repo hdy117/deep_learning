@@ -19,25 +19,25 @@ import RoPE
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class CIFAR10_ViT(nn.Module):
-    def __init__(self,img_channel:int=3,img_size=[32,32], patch_size:int=16, num_classes=10):
+    def __init__(self,img_channel:int=3,img_size=[32,32], patch_size:int=8, num_classes=10):
         super().__init__()  
         self.img_w=img_size[0]
         self.img_h=img_size[1]
         self.img_channel=img_channel
         
         self.patch_size=patch_size   # row/column of a patch, 8
-        self.patch_num=(self.img_channel)*(self.img_w//self.patch_size)*(self.img_h//self.patch_size) # total patch number, 3*2*2-->12
-        self.patch_pixel_num=self.patch_size*self.patch_size # pixel number in a patch, 16*16-->256
+        self.patch_num=(self.img_w//self.patch_size)*(self.img_h//self.patch_size) # total patch number, 4*4-->16
+        self.patch_pixel_num=self.img_channel*self.patch_size*self.patch_size # pixel number in a patch, 3*8*8-->64*3-->192
         self.num_classes=num_classes    # number of class, 10
-        self.d_model=self.patch_pixel_num*4
+        self.d_model=self.patch_pixel_num
         
         self.class_token = nn.Parameter(torch.randn(1, 1, self.d_model))  # 添加分类标记
         
         self.embedding = nn.Linear(self.patch_pixel_num, self.d_model)   # embedding
         self.RoPE=RoPE.RotaryPositionalEncoding(dim=self.d_model)
         self.transfomer_encoder=nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=16, batch_first=True,dim_feedforward=4*self.d_model),
-            num_layers=24
+            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=12, batch_first=True,dim_feedforward=4*self.d_model),
+            num_layers=12
         )
 
         # mapping feature to 10 at the end
@@ -47,9 +47,6 @@ class CIFAR10_ViT(nn.Module):
             nn.Linear(self.d_model, 4096),
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(4096, 4096),
-            nn.ReLU(),
-            nn.Dropout(0.1),
             nn.Linear(4096, self.num_classes),
         )
 
@@ -57,8 +54,9 @@ class CIFAR10_ViT(nn.Module):
         N, C, H, W = x.shape    # [512,3,32,32]
 
         # convert input to [batch, seq, feat]
-        x=x.unfold(3,self.patch_size,self.patch_size).unfold(4,self.patch_size,self.patch_size)
-        x=x.contiguous().view(N,self.patch_num,self.patch_pixel_num) # # [batch, seq, feat]
+        x=x.unfold(2,self.patch_size,self.patch_size)
+        x=x.unfold(3,self.patch_size,self.patch_size) # [batch,channel,num_patch_per_H,num_patch_per_W,patch_size,patch_size]
+        x=x.permute(0, 2, 3, 1, 4, 5).contiguous().view(N,self.patch_num,self.patch_pixel_num) # [batch,num_patch_per_H,num_patch_per_W,channel,patch_size,patch_size]
         
         # embedding and positional encoding
         x=self.embedding(x) # self.patch_pixel_num --> d_model
@@ -79,20 +77,14 @@ class CIFAR10_ViT(nn.Module):
         return x
 
 # hyper parameters
-learning_rate=1e-3
-n_epochs=60
-lr_step_size=n_epochs//3
-batch_size=128
+learning_rate=1e-6
+n_epochs=160
+lr_step_size=n_epochs
+batch_size=4096
 img_size=32
 num_classes=10
 torch_model_path=os.path.join(g_file_path,".","ViT_cifar10.pth")
-patch_size=16
-
-# 定义数据变换
-transform = transforms.Compose([
-    transforms.ToTensor(),  # 将图像转换为torch.Tensor类型，同时将像素值归一化到[0, 1]
-    # transforms.Normalize((0.1307,), (0.3081,))  # 对数据进行归一化，这里的均值和标准差是MNIST数据集的统计值
-])
+patch_size=8
 
 # 加载训练集
 train_dataset = cifar10_dataset.CustomCIFAR10Dataset(data_dir=cifar10_dataset.data_dir, train=True, \
