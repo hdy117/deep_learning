@@ -1,4 +1,4 @@
-import torch
+import torch, torchvision
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import os
@@ -66,10 +66,8 @@ class CustomCIFAR10Dataset(Dataset):
 
 # 定义数据变换
 transform = transforms.Compose([
-    transforms.ToPILImage(),
-    transforms.Resize((Image_Size,Image_Size)),
     transforms.ToTensor(),
-    # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+    transforms.Resize((Image_Size,Image_Size),interpolation=torchvision.transforms.InterpolationMode.BICUBIC)
 ])
 
 transform_no_resize = transforms.Compose([
