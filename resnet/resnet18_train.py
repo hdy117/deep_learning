@@ -17,7 +17,7 @@ import resnet_base
 
 # hyper param
 resnet_base.target_class=coco_dataset.coco_10_categories # coco_9_in_10_catetgories 
-resnet_base.lr=1e-4
+resnet_base.lr=1e-5
 resnet_base.batch_size=128
 resnet_base.n_epoch=10
 resnet_base.lr_step_size=resnet_base.n_epoch//1
