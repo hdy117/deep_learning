@@ -20,32 +20,31 @@ import RoPE
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class CIFAR10_ViT(nn.Module):
-    def __init__(self,img_channel:int=3,img_size=[224,224], patch_size:int=16, num_classes=10):
+    def __init__(self,img_channel:int=3,img_size=[64,64], patch_size:int=8, num_classes=10):
         super().__init__()  
         self.img_w=img_size[0]
         self.img_h=img_size[1]
         self.img_channel=img_channel
         
         self.patch_size=patch_size   # row/column of a patch, 8
-        self.patch_num=(self.img_w//self.patch_size)*(self.img_h//self.patch_size) # total patch number, 14*14-->196
-        self.patch_pixel_num=self.img_channel*self.patch_size*self.patch_size # pixel number in a patch, 3*16*16-->768
+        self.patch_num=(self.img_w//self.patch_size)*(self.img_h//self.patch_size) # total patch number, 8*8-->64
+        self.patch_pixel_num=self.img_channel*self.patch_size*self.patch_size # pixel number in a patch, 3*8*8-->192
         self.num_classes=num_classes    # number of class, 10
-        self.d_model=self.patch_pixel_num
+        self.d_model=max(512,self.patch_pixel_num) # make sure d_model is not less than 512
         
-        self.class_token = nn.Parameter(torch.zeros(1, 1, self.d_model))  # 添加分类标记
-        nn.init.xavier_uniform_(self.class_token)
+        self.class_token = nn.Parameter(torch.randn(1, 1, self.d_model))  # 添加分类标记
         
         self.embedding = nn.Linear(self.patch_pixel_num, self.d_model)   # embedding
         self.RoPE=RoPE.RotaryPositionalEncoding(dim=self.d_model)
         self.transfomer_encoder=nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=12, batch_first=True,dim_feedforward=4*self.d_model),
+            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=8, batch_first=True,dim_feedforward=4*self.d_model),
             num_layers=12
         )
 
         # mapping feature to 10 at the end
         self.fc = nn.Sequential(
             nn.Linear(self.d_model, 4096),
-            nn.LayerNorm(4096),
+            # nn.LayerNorm(4096),
             nn.ReLU(),
             nn.Dropout(0.1),
             nn.Linear(4096, self.num_classes),
@@ -80,7 +79,7 @@ class CIFAR10_ViT(nn.Module):
 learning_rate=1e-3
 n_epochs=10
 lr_step_size=n_epochs
-batch_size=1024
+batch_size=256
 img_size=64
 num_classes=10
 torch_model_path=os.path.join(g_file_path,".","ViT_cifar10.pth")
