@@ -20,8 +20,7 @@ from cifar10_vit import *
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # dataset and dataloader
-test_dataset = cifar10_dataset.CustomCIFAR10Dataset(data_dir=cifar10_dataset.data_dir, train=False, \
-    transform=cifar10_dataset.transform_no_resize)
+test_dataset = cifar10_dataset.CustomCIFAR10Dataset(data_dir=cifar10_dataset.data_dir, train=False, transform=transform)
 
 test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
                                           batch_size=batch_size,
