@@ -8,6 +8,7 @@ from torchvision.transforms import transforms
 import os,sys
 import matplotlib.pyplot as plt
 import time
+from torch.utils.tensorboard import SummaryWriter
 
 # global file path
 g_file_path=os.path.dirname(os.path.abspath(__file__))
@@ -30,24 +31,24 @@ class CIFAR10_ViT(nn.Module):
         self.patch_num=(self.img_w//self.patch_size)*(self.img_h//self.patch_size) # total patch number, 8*8-->64
         self.patch_pixel_num=self.img_channel*self.patch_size*self.patch_size # pixel number in a patch, 3*8*8-->192
         self.num_classes=num_classes    # number of class, 10
-        self.d_model=max(480,self.patch_pixel_num) # make sure d_model is not less than 512
+        self.d_model=max(576,self.patch_pixel_num) # make sure d_model is not less than 512
         
         self.class_token = nn.Parameter(torch.randn(1, 1, self.d_model))  # 添加分类标记
         
         self.embedding = nn.Linear(self.patch_pixel_num, self.d_model)   # embedding
         self.RoPE=RoPE.RotaryPositionalEncoding(dim=self.d_model)
         self.transfomer_encoder=nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=12, batch_first=True,dim_feedforward=4*self.d_model),
+            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=12, batch_first=True,activation='gelu',dim_feedforward=4*self.d_model),
             num_layers=12
         )
 
         # mapping feature to 10 at the end
         self.fc = nn.Sequential(
-            nn.Linear(self.d_model, 4096),
-            # nn.LayerNorm(4096),
-            nn.ReLU(),
+            nn.Linear(self.d_model, 2048),
+            nn.LayerNorm(2048),
+            nn.GELU(),
             nn.Dropout(0.1),
-            nn.Linear(4096, self.num_classes),
+            nn.Linear(2048, self.num_classes),
         )
 
     def forward(self, x:torch.Tensor):
@@ -76,26 +77,29 @@ class CIFAR10_ViT(nn.Module):
         return x
 
 # hyper parameters
-learning_rate=1e-4
-n_epochs=10
-lr_step_size=n_epochs
-batch_size=400
+learning_rate=1e-6
+n_epochs=40
+lr_step_size=n_epochs//2
+batch_size=350
 img_size=64
 num_classes=10
 torch_model_path=os.path.join(g_file_path,".","ViT_cifar10.pth")
 patch_size=8
-accumulate_steps=5
+accumulate_steps=2
 
-# 加载训练集
+# transform for dataset
 transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Resize((img_size,img_size),interpolation=torchvision.transforms.InterpolationMode.BICUBIC)
 ])
-train_dataset = cifar10_dataset.CustomCIFAR10Dataset(data_dir=cifar10_dataset.data_dir, train=True, transform=transform)
 
-train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
-                                           batch_size=batch_size,  # 每个批次的样本数量
-                                           shuffle=True)  # 是否在每个epoch打乱数据
+# train dataset
+train_dataset = cifar10_dataset.CustomCIFAR10Dataset(data_dir=cifar10_dataset.data_dir, train=True, transform=transform)
+train_loader = torch.utils.data.DataLoader(dataset=train_dataset,batch_size=batch_size,shuffle=True) 
+
+# test dataset and dataloader
+test_dataset = cifar10_dataset.CustomCIFAR10Dataset(data_dir=cifar10_dataset.data_dir, train=False, transform=transform)
+test_loader = torch.utils.data.DataLoader(dataset=test_dataset,batch_size=batch_size,shuffle=False)
 
 # model
 cifar10_vit=CIFAR10_ViT(img_channel=3, img_size=[img_size,img_size],patch_size=patch_size,num_classes=num_classes)
@@ -103,6 +107,9 @@ cifar10_vit=cifar10_vit.to(device)
 
 # define train
 def train():
+    # create tensorboard summary writter
+    summary_writer=SummaryWriter(log_dir=os.path.join(g_file_path,'log','cifar10_vit_12_layer'))
+
     # criterion
     criterion = nn.BCEWithLogitsLoss()
 
@@ -122,6 +129,7 @@ def train():
     for epoch in range(n_epochs):
         n_total=0
         n_correct=0
+        train_loss=0.0
         print('====================================')
         t_start=time.time()
         for idx, (samples, labels) in enumerate(train_loader):
@@ -136,6 +144,7 @@ def train():
 
             # loss
             loss=criterion(y_pred,labels)
+            train_loss+=loss.item()
             loss=loss/accumulate_steps
 
             # calculate gradients
@@ -155,6 +164,26 @@ def train():
                 print(f'predicted_indices[0]:{predicted_indices[0]}, labels[0]:{label_indices[0]}')
                 print(f'epoch:{epoch}, batch idx:{idx}, loss:{loss.item()}, accuracy:{n_correct / n_total}, n_total:{n_total}, n_correct:{n_correct}')
         
+        # add summary    
+        avg_train_loss = train_loss / len(train_loader)
+        summary_writer.add_scalar('loss/train', avg_train_loss, epoch)
+        
+        # log param weights
+        for name,param in cifar10_vit.named_parameters():
+            summary_writer.add_histogram(name, param, epoch)
+        
+        # test
+        with torch.no_grad():
+            test_loss=0.0
+            for batch_idx,(samples, labels) in enumerate(test_loader):
+                samples=samples.to(device)
+                labels=labels.to(device)
+                y_pred=cifar10_vit(samples)
+                test_loss+=criterion(y_pred,labels).item()
+            # Log the average test loss for this epoch
+            avg_test_loss = test_loss / len(test_loader)
+            writer.add_scalar('loss/test', avg_test_loss, epoch)
+        
         # update learning rate
         scheduler.step()
         
@@ -163,6 +192,9 @@ def train():
         
         t_end=time.time()
         print(f'elapsed time of one epoch is {t_end-t_start}')
+    
+    # close writer
+    summary_writer.close()
 
 if __name__ =="__main__":
     # img, label=train_dataset[34]

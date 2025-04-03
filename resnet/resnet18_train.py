@@ -17,10 +17,11 @@ import resnet_base
 
 # hyper param
 resnet_base.target_class=coco_dataset.coco_10_categories # coco_9_in_10_catetgories 
-resnet_base.lr=2e-5
+resnet_base.lr=1e-5
 resnet_base.batch_size=128
 resnet_base.n_epoch=20
-resnet_base.lr_step_size=resnet_base.n_epoch//2
+resnet_base.lr_step_size=resnet_base.n_epoch//1
+accumulate_steps=5
 
 # train dataloader
 train_dataset=resnet_base.COCODataset(coco_dataset.coco_train_img_dir,
@@ -60,18 +61,20 @@ def train():
             samples=samples.to(resnet_base.device)
             labels=labels.to(resnet_base.device)
 
-            # clear gradient
-            optimizer.zero_grad()
-
             # predict
             y_pred=residual_model.forward(samples)
 
             # loss
             loss=criterion.forward(y_pred, labels)
+            loss=loss/accumulate_steps
 
-            # gradient descent
+            # gradient 
             loss.backward()
-            optimizer.step()
+            
+            # gradient descent
+            if (batch_idx+1)%accumulate_steps==0:
+                optimizer.step()
+                optimizer.zero_grad()
 
             # loss
             if batch_idx%10==0:

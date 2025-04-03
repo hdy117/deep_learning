@@ -24,3 +24,4 @@ test
 bbox_test
 test_*
 transformer/data
+log
