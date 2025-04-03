@@ -30,14 +30,14 @@ class CIFAR10_ViT(nn.Module):
         self.patch_num=(self.img_w//self.patch_size)*(self.img_h//self.patch_size) # total patch number, 8*8-->64
         self.patch_pixel_num=self.img_channel*self.patch_size*self.patch_size # pixel number in a patch, 3*8*8-->192
         self.num_classes=num_classes    # number of class, 10
-        self.d_model=max(512,self.patch_pixel_num) # make sure d_model is not less than 512
+        self.d_model=max(480,self.patch_pixel_num) # make sure d_model is not less than 512
         
         self.class_token = nn.Parameter(torch.randn(1, 1, self.d_model))  # 添加分类标记
         
         self.embedding = nn.Linear(self.patch_pixel_num, self.d_model)   # embedding
         self.RoPE=RoPE.RotaryPositionalEncoding(dim=self.d_model)
         self.transfomer_encoder=nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=8, batch_first=True,dim_feedforward=4*self.d_model),
+            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=12, batch_first=True,dim_feedforward=4*self.d_model),
             num_layers=12
         )
 
@@ -76,15 +76,15 @@ class CIFAR10_ViT(nn.Module):
         return x
 
 # hyper parameters
-learning_rate=1e-3
+learning_rate=1e-4
 n_epochs=10
 lr_step_size=n_epochs
-batch_size=256
+batch_size=400
 img_size=64
 num_classes=10
 torch_model_path=os.path.join(g_file_path,".","ViT_cifar10.pth")
 patch_size=8
-# accumulate_steps=1
+accumulate_steps=5
 
 # 加载训练集
 transform = transforms.Compose([
@@ -136,15 +136,15 @@ def train():
 
             # loss
             loss=criterion(y_pred,labels)
-            # loss=loss/accumulate_steps
+            loss=loss/accumulate_steps
 
             # calculate gradients
             loss.backward()
 
             # gradient descent
-            # if (idx+1)%accumulate_steps==0:
-            optimizer.step()    
-            optimizer.zero_grad()
+            if (idx+1)%accumulate_steps==0:
+                optimizer.step()    
+                optimizer.zero_grad()
 
             # accuracy
             _, predicted_indices = torch.max(y_pred, dim=1)

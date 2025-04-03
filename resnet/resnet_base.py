@@ -71,7 +71,7 @@ class COCODataset(Dataset):
 transform = transforms.Compose([
     # transforms.RandomHorizontalFlip(),
     # transforms.RandomRotation(15),
-    transforms.RandomRotation(180),
+    transforms.RandomRotation(45),
     transforms.ToTensor()
 ])
 

@@ -5,6 +5,7 @@ import os
 import pickle
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
+from collections import Counter
 
 g_file_path=os.path.dirname(os.path.abspath(__file__))
 Image_Size=224
@@ -32,21 +33,7 @@ class CustomCIFAR10Dataset(Dataset):
             self.images = test_data[b'data'].reshape(-1, 3, 32, 32).transpose(0, 2, 3, 1)
             self.labels = test_data[b'labels']
         
-        # sub_category_id=[1,2,3,4,5,6,7,8,9,10] 
-        # coco category [person,bicycle,car,motorcycle,airplane,bus,train,truck,boat,traffic light]
-        # only extract coco matching category
-        # category_mapping={0:4,1:2,8:8,9:7}
-        # images,labels=[],[]
-        # for idx in range(len(self.labels)):
-        #     if self.labels[idx] in [0,1,8,9]:
-        #         labels.append(category_mapping[self.labels[idx]])
-        #         images.append(self.images[idx])
-        
-        # # extrac coco matching subset
-        # self.images=np.array(images)
-        # self.labels=np.array(labels)
-
-        # self.images = self.images / 255.0  # 像素值归一化到[0, 1]
+        print(f'{Counter(self.labels)}')
 
     def __len__(self):
         return len(self.labels)

@@ -246,7 +246,8 @@ class YOLO_V1_Loss(nn.Module):
         loss_noobj_confidence = 0.5 * lambda_noobj * loss_confidence
 
         # 总损失
-        loss = loss_obj_coord.sum() + loss_obj_confidence.sum() + loss_obj_class.sum() + loss_noobj_confidence.sum()
+        # loss = loss_obj_coord.mean() + loss_obj_confidence.mean() + loss_obj_class.mean() + loss_noobj_confidence.mean()
+        loss = (loss_obj_coord + loss_obj_confidence + loss_obj_class + loss_noobj_confidence).mean()
 
         return loss
 

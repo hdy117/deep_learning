@@ -28,8 +28,8 @@ class YOLO_V1_Transfer(nn.Module):
 
         # 全连接层
         self.fc = nn.Sequential(
-            nn.BatchNorm1d(512*7*7),
-            nn.ReLU(inplace=True),
+            # nn.BatchNorm1d(512*7*7),
+            # nn.ReLU(inplace=True),
             nn.Linear(512*7*7, 4096),
             nn.BatchNorm1d(4096),
             nn.ReLU(inplace=True),
@@ -54,11 +54,11 @@ class YOLO_V1_Transfer(nn.Module):
         return pred_class, pred_coord, pred_conf
     
 # hyper param
-HyperParam.learning_rate=0.0002
+HyperParam.learning_rate=1e-3
 HyperParam.weight_decay=0.0005
-HyperParam.batch_size=512
-HyperParam.n_epoch=10
-HyperParam.lr_step_size=HyperParam.n_epoch//2
+HyperParam.batch_size=400
+HyperParam.n_epoch=30
+HyperParam.lr_step_size=HyperParam.n_epoch//3
 
 # train dataloader
 train_dataset=yolo_v1.COCODataset(coco_dataset.coco_train_img_dir,

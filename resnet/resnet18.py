@@ -76,8 +76,8 @@ class ResNet18(nn.Module):
 
         # fc
         self.fc = nn.Sequential(
-            nn.BatchNorm1d(512*7*7),
-            nn.LeakyReLU(inplace=True),
+            # nn.BatchNorm1d(512*7*7),
+            # nn.LeakyReLU(inplace=True),
             nn.Linear(512*7*7, 4096),
             nn.BatchNorm1d(4096),
             nn.LeakyReLU(inplace=True),
