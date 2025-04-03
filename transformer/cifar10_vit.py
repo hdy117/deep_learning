@@ -182,7 +182,7 @@ def train():
                 test_loss+=criterion(y_pred,labels).item()
             # Log the average test loss for this epoch
             avg_test_loss = test_loss / len(test_loader)
-            writer.add_scalar('loss/test', avg_test_loss, epoch)
+            summary_writer.add_scalar('loss/test', avg_test_loss, epoch)
         
         # update learning rate
         scheduler.step()
