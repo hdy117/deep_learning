@@ -31,7 +31,7 @@ class CIFAR10_ViT(nn.Module):
         self.patch_num=(self.img_w//self.patch_size)*(self.img_h//self.patch_size) # total patch number, 8*8-->64
         self.patch_pixel_num=self.img_channel*self.patch_size*self.patch_size # pixel number in a patch, 3*8*8-->192
         self.num_classes=num_classes    # number of class, 10
-        self.d_model=max(576,self.patch_pixel_num) # make sure d_model is not less than 512
+        self.d_model=max(768,self.patch_pixel_num) # make sure d_model is not less than 512
         
         self.class_token = nn.Parameter(torch.randn(1, 1, self.d_model))  # 添加分类标记
         
@@ -44,11 +44,11 @@ class CIFAR10_ViT(nn.Module):
 
         # mapping feature to 10 at the end
         self.fc = nn.Sequential(
-            nn.Linear(self.d_model, 2048),
-            nn.LayerNorm(2048),
+            nn.Linear(self.d_model, 4096),
+            nn.BatchNorm1d(4096),
             nn.GELU(),
             nn.Dropout(0.1),
-            nn.Linear(2048, self.num_classes),
+            nn.Linear(4096, self.num_classes),
         )
 
     def forward(self, x:torch.Tensor):
@@ -77,10 +77,10 @@ class CIFAR10_ViT(nn.Module):
         return x
 
 # hyper parameters
-learning_rate=1e-6
-n_epochs=40
-lr_step_size=n_epochs//2
-batch_size=350
+learning_rate=2e-4
+n_epochs=45
+lr_step_size=n_epochs//3
+batch_size=300
 img_size=64
 num_classes=10
 torch_model_path=os.path.join(g_file_path,".","ViT_cifar10.pth")
