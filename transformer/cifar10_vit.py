@@ -32,7 +32,7 @@ class CIFAR10_ViT(nn.Module):
         self.patch_num=(self.img_w//self.patch_size)*(self.img_h//self.patch_size) # total patch number, 8*8-->64
         self.patch_pixel_num=self.img_channel*self.patch_size*self.patch_size # pixel number in a patch, 3*8*8-->192
         self.num_classes=num_classes    # number of class, 10
-        self.d_model=max(480,self.patch_pixel_num) # make sure d_model is not less than 480
+        self.d_model=max(768,self.patch_pixel_num) # make sure d_model is not less than 1024
         
         self.class_token = nn.Parameter(torch.randn(1, 1, self.d_model))  # 添加分类标记
         
@@ -42,20 +42,16 @@ class CIFAR10_ViT(nn.Module):
             nn.TransformerEncoderLayer(d_model=self.d_model, nhead=12, batch_first=True,
                                        activation='gelu',dim_feedforward=4*self.d_model,
                                        dropout=self.drop_out),
-            num_layers=16
+            num_layers=12
         )
 
         # mapping feature to 10 at the end
         self.fc = nn.Sequential(
-            nn.Linear(self.d_model, 1024),
-            nn.BatchNorm1d(1024),
+            nn.Linear(self.d_model, 4096),
+            nn.BatchNorm1d(4096),
             nn.GELU(),
             nn.Dropout(self.drop_out),
-            nn.Linear(1024, 1024),
-            nn.BatchNorm1d(1024),
-            nn.GELU(),
-            nn.Dropout(self.drop_out),
-            nn.Linear(1024, self.num_classes),
+            nn.Linear(4096, self.num_classes),
         )
 
     def forward(self, x:torch.Tensor):
@@ -88,7 +84,7 @@ learning_rate=2e-4
 n_epochs=45
 lr_step_size=n_epochs//3
 gamma=0.1
-batch_size=300
+batch_size=250
 img_size=64
 num_classes=10
 torch_model_path=os.path.join(g_file_path,".","ViT_cifar10.pth")
@@ -97,7 +93,7 @@ accumulate_steps=2
 
 # transform for dataset
 transform = transforms.Compose([
-    transforms.RandomRotation(180),
+    transforms.RandomRotation(15),
     transforms.ToTensor(),
     transforms.Resize((img_size,img_size),interpolation=torchvision.transforms.InterpolationMode.BICUBIC)
 ])
@@ -123,7 +119,7 @@ cifar10_vit=cifar10_vit.to(device)
 # define train
 def train():
     # create tensorboard summary writter
-    summary_writer=SummaryWriter(log_dir=os.path.join(g_file_path,'log','vit_16_layers_crossentropy'))
+    summary_writer=SummaryWriter(log_dir=os.path.join(g_file_path,'log','vit_random_rotate'))
 
     # criterion
     criterion = nn.CrossEntropyLoss()
