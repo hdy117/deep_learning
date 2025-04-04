@@ -51,7 +51,6 @@ def test():
     total_true_positives = np.zeros(num_classes)
     total_predicted_positives =np.zeros(num_classes)
     total_actual_positives =np.zeros(num_classes)
-    conf_thresh = 0.6  # Adjust threshold if needed
 
     with torch.no_grad():
         print('================ Test ==================')
@@ -59,16 +58,20 @@ def test():
             # Move data to device
             samples = samples.to(device)
             labels = labels.to(device)
+            
+            N=samples.shape[0] # batch size
 
             # Predict
-            y_pred = model(samples).sigmoid()  # Apply sigmoid activation
+            y_pred = model(samples) 
 
             # Convert predictions to binary (0 or 1)
-            y_pred_bin = (y_pred > conf_thresh).float()
+            y_pred_label=torch.argmax(y_pred, dim=1) # pred label
+            y_pred_bin = torch.zeros(N, num_classes, device=y_pred.device)
+            y_pred_bin.scatter_(dim=1, index=y_pred_label.unsqueeze(1), value=1.0)
 
             # Calculate batch metrics
             batch_correct = (y_pred_bin == labels).sum().item()
-            batch_total = labels.numel()
+            batch_total = N
 
             # Precision and recall calculations
             true_positives = (y_pred_bin * labels).sum(dim=0).cpu().numpy()

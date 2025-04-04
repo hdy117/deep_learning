@@ -32,7 +32,7 @@ class CIFAR10_ViT(nn.Module):
         self.patch_num=(self.img_w//self.patch_size)*(self.img_h//self.patch_size) # total patch number, 8*8-->64
         self.patch_pixel_num=self.img_channel*self.patch_size*self.patch_size # pixel number in a patch, 3*8*8-->192
         self.num_classes=num_classes    # number of class, 10
-        self.d_model=max(768,self.patch_pixel_num) # make sure d_model is not less than 512
+        self.d_model=max(480,self.patch_pixel_num) # make sure d_model is not less than 480
         
         self.class_token = nn.Parameter(torch.randn(1, 1, self.d_model))  # 添加分类标记
         
@@ -42,16 +42,20 @@ class CIFAR10_ViT(nn.Module):
             nn.TransformerEncoderLayer(d_model=self.d_model, nhead=12, batch_first=True,
                                        activation='gelu',dim_feedforward=4*self.d_model,
                                        dropout=self.drop_out),
-            num_layers=12
+            num_layers=16
         )
 
         # mapping feature to 10 at the end
         self.fc = nn.Sequential(
-            nn.Linear(self.d_model, 4096),
-            nn.BatchNorm1d(4096),
+            nn.Linear(self.d_model, 1024),
+            nn.BatchNorm1d(1024),
             nn.GELU(),
             nn.Dropout(self.drop_out),
-            nn.Linear(4096, self.num_classes),
+            nn.Linear(1024, 1024),
+            nn.BatchNorm1d(1024),
+            nn.GELU(),
+            nn.Dropout(self.drop_out),
+            nn.Linear(1024, self.num_classes),
         )
 
     def forward(self, x:torch.Tensor):
@@ -81,9 +85,9 @@ class CIFAR10_ViT(nn.Module):
 
 # hyper parameters
 learning_rate=2e-4
-n_epochs=27
+n_epochs=45
 lr_step_size=n_epochs//3
-gamma=0.5
+gamma=0.1
 batch_size=300
 img_size=64
 num_classes=10
@@ -119,10 +123,10 @@ cifar10_vit=cifar10_vit.to(device)
 # define train
 def train():
     # create tensorboard summary writter
-    summary_writer=SummaryWriter(log_dir=os.path.join(g_file_path,'log','vit_dropout_0.1_gamma_0.5'))
+    summary_writer=SummaryWriter(log_dir=os.path.join(g_file_path,'log','vit_16_layers_crossentropy'))
 
     # criterion
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.CrossEntropyLoss()
 
     # optimizer
     optimizer = torch.optim.Adam(cifar10_vit.parameters(), lr=learning_rate, weight_decay=5e-4)
@@ -144,14 +148,12 @@ def train():
         print('====================================')
         t_start=time.time()
         for idx, (samples, labels) in enumerate(train_loader):
-            # print(f"len(samples):{len(samples)}, {samples.shape}")
-            # print(f"len(labels):{len(labels)}, {labels.shape}")
-            # to device
             samples=samples.to(device)
             labels=labels.to(device)
+            labels=torch.argmax(labels,dim=1) # one hot to scalar label
 
             # prediction
-            y_pred = cifar10_vit.forward(samples)
+            y_pred = cifar10_vit(samples)
 
             # loss
             loss=criterion(y_pred,labels)
@@ -167,12 +169,11 @@ def train():
                 optimizer.zero_grad()
 
             # accuracy
-            _, predicted_indices = torch.max(y_pred, dim=1)
-            _, label_indices = torch.max(labels, dim=1)
+            pred_label = torch.argmax(y_pred, dim=1)
             n_total += y_pred.shape[0]
-            n_correct += (predicted_indices == label_indices).sum().item()
+            n_correct += (pred_label == labels).sum().item()
             if (idx+1)%10==0:
-                print(f'predicted_indices[0]:{predicted_indices[0]}, labels[0]:{label_indices[0]}')
+                print(f'pred_label[0]:{pred_label[0]}, labels[0]:{labels[0]}')
                 print(f'epoch:{epoch}, batch idx:{idx}, loss:{loss.item()}, accuracy:{n_correct / n_total}, n_total:{n_total}, n_correct:{n_correct}')
         
         # add summary    
@@ -185,20 +186,25 @@ def train():
         
         # test
         with torch.no_grad():
-            test_loss=0.0
-            precision=0.0
-            recall=0.0
-            confidence_thresh=0.6
+            test_loss,precision,recall=0.0,0.0,0.0
             predict_positive=torch.zeros(num_classes)
             true_positive=torch.zeros(num_classes)
             actual_positive=torch.zeros(num_classes)
             for batch_idx,(samples, labels) in enumerate(test_loader):
                 samples=samples.to(device)
-                labels=labels.to(device)
+                labels=labels.to(device) # one-hot
+                scalar_labels=torch.argmax(labels, dim=1) # one hot label to scalar label
+                
+                N=samples.shape[0] # batch size
+                
                 y_pred=cifar10_vit(samples) # predict
-                test_loss+=criterion(y_pred,labels).item() # loss
-                y_pred=y_pred.sigmoid() # add sigmoid
-                y_pred_bin=(y_pred>confidence_thresh).float() # to bin
+                
+                test_loss+=criterion(y_pred,scalar_labels).item() # loss
+                
+                y_pred_label=torch.argmax(y_pred, dim=1) # pred label
+                y_pred_bin = torch.zeros(N, num_classes, device=y_pred.device)
+                y_pred_bin.scatter_(dim=1, index=y_pred_label.unsqueeze(1), value=1.0)
+                
                 
                 # actual positive in test set
                 actual_positive+=labels.sum(dim=0).cpu()
@@ -216,8 +222,8 @@ def train():
             precision=torch.divide(true_positive,predict_positive+epslion).mean()
             recall=torch.divide(true_positive,actual_positive+epslion).mean()
             # log precision and recall on test set
-            summary_writer.add_scalar('precision/test',precision,epoch)
-            summary_writer.add_scalar('recall/test',recall,epoch)
+            summary_writer.add_scalar('precision-recall/precision',precision,epoch)
+            summary_writer.add_scalar('precision-recall/recall',recall,epoch)
             print(f'test ---> precision:{precision}, recall:{recall}')
         
         # update learning rate
