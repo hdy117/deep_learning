@@ -26,6 +26,7 @@ class CIFAR10_ViT(nn.Module):
         self.img_w=img_size[0]
         self.img_h=img_size[1]
         self.img_channel=img_channel
+        self.drop_out=0.1
         
         self.patch_size=patch_size   # row/column of a patch, 8
         self.patch_num=(self.img_w//self.patch_size)*(self.img_h//self.patch_size) # total patch number, 8*8-->64
@@ -38,7 +39,9 @@ class CIFAR10_ViT(nn.Module):
         self.embedding = nn.Linear(self.patch_pixel_num, self.d_model)   # embedding
         self.RoPE=RoPE.RotaryPositionalEncoding(dim=self.d_model)
         self.transfomer_encoder=nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=12, batch_first=True,activation='gelu',dim_feedforward=4*self.d_model),
+            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=12, batch_first=True,
+                                       activation='gelu',dim_feedforward=4*self.d_model,
+                                       dropout=self.drop_out),
             num_layers=12
         )
 
@@ -47,7 +50,7 @@ class CIFAR10_ViT(nn.Module):
             nn.Linear(self.d_model, 4096),
             nn.BatchNorm1d(4096),
             nn.GELU(),
-            nn.Dropout(0.1),
+            nn.Dropout(self.drop_out),
             nn.Linear(4096, self.num_classes),
         )
 
@@ -77,9 +80,10 @@ class CIFAR10_ViT(nn.Module):
         return x
 
 # hyper parameters
-learning_rate=2e-4
-n_epochs=45
+learning_rate=3e-4
+n_epochs=25
 lr_step_size=n_epochs//3
+gamma=0.5
 batch_size=300
 img_size=64
 num_classes=10
@@ -108,7 +112,7 @@ cifar10_vit=cifar10_vit.to(device)
 # define train
 def train():
     # create tensorboard summary writter
-    summary_writer=SummaryWriter(log_dir=os.path.join(g_file_path,'log','cifar10_vit_12_layer'))
+    summary_writer=SummaryWriter(log_dir=os.path.join(g_file_path,'log','vit_dropout_0.1_gamma_0.5'))
 
     # criterion
     criterion = nn.BCEWithLogitsLoss()
@@ -118,7 +122,7 @@ def train():
 
     # scheduler
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 
-        step_size=lr_step_size, gamma=0.1)
+        step_size=lr_step_size, gamma=gamma)
 
     # load torch model
     if os.path.exists(torch_model_path):
@@ -175,14 +179,39 @@ def train():
         # test
         with torch.no_grad():
             test_loss=0.0
+            precision=0.0
+            recall=0.0
+            confidence_thresh=0.6
+            predict_positive=torch.zeros(num_classes)
+            true_positive=torch.zeros(num_classes)
+            actual_positive=torch.zeros(num_classes)
             for batch_idx,(samples, labels) in enumerate(test_loader):
                 samples=samples.to(device)
                 labels=labels.to(device)
-                y_pred=cifar10_vit(samples)
-                test_loss+=criterion(y_pred,labels).item()
+                y_pred=cifar10_vit(samples) # predict
+                test_loss+=criterion(y_pred,labels).item() # loss
+                y_pred=y_pred.sigmoid() # add sigmoid
+                y_pred_bin=(y_pred>confidence_thresh).float() # to bin
+                
+                # actual positive in test set
+                actual_positive+=labels.sum(dim=0).cpu()
+                # model predict positive
+                predict_positive+=y_pred_bin.sum(dim=0).cpu()
+                # model predict correctly positive
+                true_positive+=(y_pred_bin*labels).sum(dim=0).cpu()
+                
             # Log the average test loss for this epoch
             avg_test_loss = test_loss / len(test_loader)
             summary_writer.add_scalar('loss/test', avg_test_loss, epoch)
+            
+            # precision and recall
+            epslion=1e-8
+            precision=torch.divide(true_positive,predict_positive+epslion).mean()
+            recall=torch.divide(true_positive,actual_positive+epslion).mean()
+            # log precision and recall on test set
+            summary_writer.add_scalar('precision/test',precision,epoch)
+            summary_writer.add_scalar('recall/test',recall,epoch)
+            print(f'test ---> precision:{precision}, recall:{recall}')
         
         # update learning rate
         scheduler.step()
