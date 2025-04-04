@@ -210,8 +210,8 @@ def train():
                 actual_positive+=labels.sum(dim=0).cpu()
                 # model predict positive
                 predict_positive+=y_pred_bin.sum(dim=0).cpu()
-                # model predict correctly positive
-                true_positive+=(y_pred_bin*labels).sum(dim=0).cpu()
+                # model predict correctly positive, bigger than 0.9 will make sure it is a true positive
+                true_positive+=(y_pred_bin*labels>0.9).sum(dim=0).cpu()
                 
             # Log the average test loss for this epoch
             avg_test_loss = test_loss / len(test_loader)

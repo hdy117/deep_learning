@@ -48,7 +48,7 @@ class CustomCIFAR10Dataset(Dataset):
 
         # 将标签转换为one - hot编码
         one_hot_label = torch.zeros(10)
-        one_hot_label[label] = 1
+        one_hot_label[label] = 1.0
 
         if self.transform:
             image = self.transform(image)

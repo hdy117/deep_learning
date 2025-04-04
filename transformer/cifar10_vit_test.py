@@ -48,9 +48,9 @@ def test():
     # Evaluation metrics
     total_samples = 0
     total_correct = 0
-    total_true_positives = np.zeros(num_classes)
-    total_predicted_positives =np.zeros(num_classes)
-    total_actual_positives =np.zeros(num_classes)
+    total_true_positives = torch.zeros(num_classes)
+    total_predicted_positives =torch.zeros(num_classes)
+    total_actual_positives =torch.zeros(num_classes)
 
     with torch.no_grad():
         print('================ Test ==================')
@@ -67,37 +67,42 @@ def test():
             # Convert predictions to binary (0 or 1)
             y_pred_label=torch.argmax(y_pred, dim=1) # pred label
             y_pred_bin = torch.zeros(N, num_classes, device=y_pred.device)
-            y_pred_bin.scatter_(dim=1, index=y_pred_label.unsqueeze(1), value=1.0)
+            # y_pred_bin.scatter_(dim=1, index=y_pred_label.unsqueeze(1), value=1.0)
+            for i in range(N):
+                y_pred_bin[i,y_pred_label[i]]=1.0
 
             # Calculate batch metrics
-            batch_correct = (y_pred_bin == labels).sum().item()
+            batch_correct = (y_pred_bin == labels).float().sum().item()
             batch_total = N
 
             # Precision and recall calculations
-            true_positives = (y_pred_bin * labels).sum(dim=0).cpu().numpy()
-            predicted_positives = y_pred_bin.sum(dim=0).cpu().numpy()
-            actual_positives = labels.sum(dim=0).cpu().numpy()
+            true_positives = (y_pred_bin * labels > 0.9).float().sum(dim=0).cpu()
+            predicted_positives = y_pred_bin.sum(dim=0).cpu()
+            actual_positives = labels.sum(dim=0).cpu()
 
             # Aggregate results
             total_correct += batch_correct
-            total_samples += batch_total
+            total_samples += batch_total*num_classes
+            
             total_true_positives += true_positives
             total_predicted_positives += predicted_positives
             total_actual_positives += actual_positives
 
             # Print sample predictions
             if batch_idx % 10 == 0:
-                for batch in range(min(3, samples.shape[0])):  # Show up to 3 samples
+                # print(f'true_positives:{true_positives}')
+                # print(f'predicted_positives:{predicted_positives}')
+                # print(f'actual_positives:{actual_positives}')
+                for batch in range(min(1, samples.shape[0])):  # Show up to 3 samples
                     label_list = [f'{int(val)}' for val in labels[batch].tolist()]
                     pred_list = [f'{int(val)}' for val in y_pred_bin[batch].tolist()]
                     print(f'Label: {label_list}, Pred: {pred_list}')
 
         # Final Metrics
+        epslion=1e-8
         accuracy = total_correct / total_samples
-        precision = np.divide(total_true_positives, total_predicted_positives,
-                              out=np.zeros_like(total_true_positives), where=total_predicted_positives > 0)
-        recall = np.divide(total_true_positives, total_actual_positives,
-                           out=np.zeros_like(total_true_positives), where=total_actual_positives > 0)
+        precision = torch.divide(total_true_positives, total_predicted_positives+epslion).numpy()
+        recall = torch.divide(total_true_positives, total_actual_positives+epslion).numpy()
         avg_precision = precision.mean()
         avg_recall = recall.mean()
 
