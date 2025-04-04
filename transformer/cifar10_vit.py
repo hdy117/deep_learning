@@ -80,8 +80,8 @@ class CIFAR10_ViT(nn.Module):
         return x
 
 # hyper parameters
-learning_rate=3e-4
-n_epochs=25
+learning_rate=2e-4
+n_epochs=27
 lr_step_size=n_epochs//3
 gamma=0.5
 batch_size=300
@@ -93,7 +93,7 @@ accumulate_steps=2
 
 # transform for dataset
 transform = transforms.Compose([
-    transforms.RandomRotation(90),
+    transforms.RandomRotation(180),
     transforms.ToTensor(),
     transforms.Resize((img_size,img_size),interpolation=torchvision.transforms.InterpolationMode.BICUBIC)
 ])
