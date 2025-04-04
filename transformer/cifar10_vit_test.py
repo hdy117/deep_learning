@@ -90,9 +90,10 @@ def test():
 
             # Print sample predictions
             if batch_idx % 10 == 0:
-                # print(f'true_positives:{true_positives}')
-                # print(f'predicted_positives:{predicted_positives}')
-                # print(f'actual_positives:{actual_positives}')
+                print(f'***********************')
+                print(f'true_positives:{true_positives}')
+                print(f'predicted_positives:{predicted_positives}')
+                print(f'actual_positives:{actual_positives}')
                 for batch in range(min(1, samples.shape[0])):  # Show up to 3 samples
                     label_list = [f'{int(val)}' for val in labels[batch].tolist()]
                     pred_list = [f'{int(val)}' for val in y_pred_bin[batch].tolist()]
