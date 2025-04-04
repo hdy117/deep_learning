@@ -88,7 +88,7 @@ batch_size=250
 img_size=64
 num_classes=10
 torch_model_path=os.path.join(g_file_path,".","ViT_cifar10.pth")
-patch_size=8
+patch_size=16
 accumulate_steps=2
 
 # transform for dataset
