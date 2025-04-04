@@ -93,6 +93,7 @@ accumulate_steps=2
 
 # transform for dataset
 transform = transforms.Compose([
+    transforms.RandomRotation(90),
     transforms.ToTensor(),
     transforms.Resize((img_size,img_size),interpolation=torchvision.transforms.InterpolationMode.BICUBIC)
 ])
