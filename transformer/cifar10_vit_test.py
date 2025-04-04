@@ -19,6 +19,12 @@ from cifar10_vit import *
 # device
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+# transform for dataset
+transform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Resize((img_size,img_size),interpolation=torchvision.transforms.InterpolationMode.BICUBIC)
+])
+
 # dataset and dataloader
 test_dataset = cifar10_dataset.CustomCIFAR10Dataset(data_dir=cifar10_dataset.data_dir, train=False, transform=transform)
 

@@ -6,6 +6,7 @@ import pickle
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 from collections import Counter
+from PIL import Image
 
 g_file_path=os.path.dirname(os.path.abspath(__file__))
 Image_Size=224
@@ -41,6 +42,9 @@ class CustomCIFAR10Dataset(Dataset):
     def __getitem__(self, idx):
         image = self.images[idx]
         label = self.labels[idx]
+        
+        # to PIL Image
+        image=Image.fromarray(image)
 
         # 将标签转换为one - hot编码
         one_hot_label = torch.zeros(10)
