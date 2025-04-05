@@ -56,6 +56,7 @@ def test():
 
     with torch.no_grad():
         print('================ Test ==================')
+        conf_thresh=0.0
         for batch_idx, (samples, labels) in enumerate(test_loader):
             # Move data to device
             samples = samples.to(device)
@@ -70,16 +71,14 @@ def test():
             # Convert predictions to binary (0 or 1)
             y_pred_label=torch.argmax(y_pred, dim=1) # pred label
             y_pred_bin = torch.zeros(N, num_classes, device=y_pred.device)
-            # y_pred_bin.scatter_(dim=1, index=y_pred_label.unsqueeze(1), value=1.0)
-            for i in range(N):
-                y_pred_bin[i,y_pred_label[i]]=1.0
+            y_pred_bin.scatter_(dim=1, index=y_pred_label.unsqueeze(1), value=1.0)
 
             # Calculate batch metrics
             batch_correct = (y_pred_bin == labels).float().sum().item()
             batch_total = N
 
             # Precision and recall calculations, bigger than conf_thresh will make sure it is a true positive
-            true_positives = (y_pred * labels > conf_thresh).float().sum(dim=0).cpu()
+            true_positives = ((y_pred_bin==labels)*(y_pred_bin>0.5)).float().sum(dim=0).cpu()
             predicted_positives = y_pred_bin.sum(dim=0).cpu()
             actual_positives = labels.sum(dim=0).cpu()
 

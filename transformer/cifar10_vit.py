@@ -85,15 +85,15 @@ class CIFAR10_ViT(nn.Module):
 
 # hyper parameters
 learning_rate=2e-4
-n_epochs=30
-T_0=10
+eta_min=2e-6
+T_0=8
+n_epochs=3*T_0
 batch_size=300
 img_size=112
 num_classes=10
 torch_model_path=os.path.join(g_file_path,".","ViT_cifar10.pth")
 patch_size=16
-accumulate_steps=3
-conf_thresh=0.5 # confidence thresh
+accumulate_steps=10
 
 # transform for dataset
 transform = transforms.Compose([
@@ -134,7 +134,7 @@ def train():
     # scheduler
     # scheduler = torch.optim.lr_scheduler.StepLR(optimizer,step_size=lr_step_size, gamma=gamma)
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=n_epochs,eta_min=1e-5)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer=optimizer,T_0=T_0,eta_min=1e-5,T_mult=1)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer=optimizer,T_0=T_0,eta_min=eta_min,T_mult=1)
 
     # load torch model
     if os.path.exists(torch_model_path):
@@ -213,8 +213,8 @@ def train():
                 actual_positive+=labels.sum(dim=0).cpu()
                 # model predict positive
                 predict_positive+=y_pred_bin.sum(dim=0).cpu()
-                # model predict correctly positive, bigger than conf_thresh will make sure it is a true positive
-                true_positive+=(y_pred*labels>conf_thresh).sum(dim=0).cpu()
+                # model predict correctly positive, bigger than 0.5 will make sure it is a true positive
+                true_positive+=((y_pred_bin==labels)*(y_pred_bin>0.5)).float().sum(dim=0).cpu()
                 
             # Log the average test loss for this epoch
             avg_test_loss = test_loss / len(test_loader)
