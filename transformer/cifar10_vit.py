@@ -21,18 +21,18 @@ import RoPE
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class CIFAR10_ViT(nn.Module):
-    def __init__(self,img_channel:int=3,img_size=[64,64], patch_size:int=8, num_classes=10):
+    def __init__(self,img_channel:int=3,img_size=[112,112], patch_size:int=16, num_classes=10):
         super().__init__()  
         self.img_w=img_size[0]
         self.img_h=img_size[1]
         self.img_channel=img_channel
         self.drop_out=0.1
         
-        self.patch_size=patch_size   # row/column of a patch, 8
-        self.patch_num=(self.img_w//self.patch_size)*(self.img_h//self.patch_size) # total patch number, 8*8-->64
-        self.patch_pixel_num=self.img_channel*self.patch_size*self.patch_size # pixel number in a patch, 3*8*8-->192
+        self.patch_size=patch_size   # row/column of a patch, 16
+        self.patch_num=(self.img_w//self.patch_size)*(self.img_h//self.patch_size) # total patch number, 7*7-->49
+        self.patch_pixel_num=self.img_channel*self.patch_size*self.patch_size # pixel number in a patch, 3*16*16-->768
         self.num_classes=num_classes    # number of class, 10
-        self.d_model=max(768,self.patch_pixel_num) # make sure d_model is not less than 1024
+        self.d_model=max(768,self.patch_pixel_num) # make sure d_model is not less than 768
         
         self.class_token = nn.Parameter(torch.randn(1, 1, self.d_model))  # 添加分类标记
         
@@ -47,11 +47,15 @@ class CIFAR10_ViT(nn.Module):
 
         # mapping feature to 10 at the end
         self.fc = nn.Sequential(
-            nn.Linear(self.d_model, 4096),
-            nn.BatchNorm1d(4096),
+            nn.Linear(self.d_model, 1024),
+            nn.BatchNorm1d(1024),
             nn.GELU(),
             nn.Dropout(self.drop_out),
-            nn.Linear(4096, self.num_classes),
+            nn.Linear(1024, 1024),
+            nn.BatchNorm1d(1024),
+            nn.GELU(),
+            nn.Dropout(self.drop_out),
+            nn.Linear(1024, self.num_classes),
         )
 
     def forward(self, x:torch.Tensor):
@@ -81,15 +85,15 @@ class CIFAR10_ViT(nn.Module):
 
 # hyper parameters
 learning_rate=2e-4
-n_epochs=45
-lr_step_size=n_epochs//3
-gamma=0.1
-batch_size=250
-img_size=64
+n_epochs=30
+T_0=10
+batch_size=300
+img_size=112
 num_classes=10
 torch_model_path=os.path.join(g_file_path,".","ViT_cifar10.pth")
 patch_size=16
-accumulate_steps=2
+accumulate_steps=3
+conf_thresh=0.5 # confidence thresh
 
 # transform for dataset
 transform = transforms.Compose([
@@ -128,8 +132,9 @@ def train():
     optimizer = torch.optim.Adam(cifar10_vit.parameters(), lr=learning_rate, weight_decay=5e-4)
 
     # scheduler
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 
-        step_size=lr_step_size, gamma=gamma)
+    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer,step_size=lr_step_size, gamma=gamma)
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=n_epochs,eta_min=1e-5)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer=optimizer,T_0=T_0,eta_min=1e-5,T_mult=1)
 
     # load torch model
     if os.path.exists(torch_model_path):
@@ -186,6 +191,7 @@ def train():
             predict_positive=torch.zeros(num_classes)
             true_positive=torch.zeros(num_classes)
             actual_positive=torch.zeros(num_classes)
+            softmax=nn.Softmax(dim=1)
             for batch_idx,(samples, labels) in enumerate(test_loader):
                 samples=samples.to(device)
                 labels=labels.to(device) # one-hot
@@ -196,6 +202,7 @@ def train():
                 y_pred=cifar10_vit(samples) # predict
                 
                 test_loss+=criterion(y_pred,scalar_labels).item() # loss
+                y_pred=softmax(y_pred)
                 
                 y_pred_label=torch.argmax(y_pred, dim=1) # pred label
                 y_pred_bin = torch.zeros(N, num_classes, device=y_pred.device)
@@ -206,8 +213,8 @@ def train():
                 actual_positive+=labels.sum(dim=0).cpu()
                 # model predict positive
                 predict_positive+=y_pred_bin.sum(dim=0).cpu()
-                # model predict correctly positive, bigger than 0.9 will make sure it is a true positive
-                true_positive+=(y_pred_bin*labels>0.9).sum(dim=0).cpu()
+                # model predict correctly positive, bigger than conf_thresh will make sure it is a true positive
+                true_positive+=(y_pred*labels>conf_thresh).sum(dim=0).cpu()
                 
             # Log the average test loss for this epoch
             avg_test_loss = test_loss / len(test_loader)
@@ -215,12 +222,19 @@ def train():
             
             # precision and recall
             epslion=1e-8
-            precision=torch.divide(true_positive,predict_positive+epslion).mean()
-            recall=torch.divide(true_positive,actual_positive+epslion).mean()
+            precision=torch.divide(true_positive,predict_positive+epslion)
+            recall=torch.divide(true_positive,actual_positive+epslion)
             # log precision and recall on test set
-            summary_writer.add_scalar('precision-recall/precision',precision,epoch)
-            summary_writer.add_scalar('precision-recall/recall',recall,epoch)
-            print(f'test ---> precision:{precision}, recall:{recall}')
+            summary_writer.add_scalar('precision-recall/precision',precision.mean(),epoch)
+            summary_writer.add_scalar('precision-recall/recall',recall.mean(),epoch)
+            print(f'***********************')
+            print(f'test ---> precision:{precision.mean()}')
+            print(f'test ---> recall:{recall.mean()}')
+            print(f'test ---> true_positive:{true_positive}')
+            print(f'test ---> predict_positive:{predict_positive}')
+            print(f'test ---> actual_positive:{actual_positive}')
+            print(f'test ---> precision:{precision}')
+            print(f'test ---> recall:{recall}')
         
         # update learning rate
         scheduler.step()

@@ -51,6 +51,8 @@ def test():
     total_true_positives = torch.zeros(num_classes)
     total_predicted_positives =torch.zeros(num_classes)
     total_actual_positives =torch.zeros(num_classes)
+    
+    softmax=nn.Softmax(dim=1)
 
     with torch.no_grad():
         print('================ Test ==================')
@@ -63,6 +65,7 @@ def test():
 
             # Predict
             y_pred = model(samples) 
+            y_pred = softmax(y_pred)
 
             # Convert predictions to binary (0 or 1)
             y_pred_label=torch.argmax(y_pred, dim=1) # pred label
@@ -75,8 +78,8 @@ def test():
             batch_correct = (y_pred_bin == labels).float().sum().item()
             batch_total = N
 
-            # Precision and recall calculations, bigger than 0.9 will make sure it is a true positive
-            true_positives = (y_pred_bin * labels > 0.9).float().sum(dim=0).cpu()
+            # Precision and recall calculations, bigger than conf_thresh will make sure it is a true positive
+            true_positives = (y_pred * labels > conf_thresh).float().sum(dim=0).cpu()
             predicted_positives = y_pred_bin.sum(dim=0).cpu()
             actual_positives = labels.sum(dim=0).cpu()
 
@@ -91,9 +94,6 @@ def test():
             # Print sample predictions
             if batch_idx % 10 == 0:
                 print(f'***********************')
-                print(f'true_positives:{true_positives}')
-                print(f'predicted_positives:{predicted_positives}')
-                print(f'actual_positives:{actual_positives}')
                 for batch in range(min(1, samples.shape[0])):  # Show up to 3 samples
                     label_list = [f'{int(val)}' for val in labels[batch].tolist()]
                     pred_list = [f'{int(val)}' for val in y_pred_bin[batch].tolist()]
@@ -107,6 +107,9 @@ def test():
         avg_precision = precision.mean()
         avg_recall = recall.mean()
 
+        print(f'total_true_positives:{total_true_positives}')
+        print(f'total_predicted_positives:{total_predicted_positives}')
+        print(f'total_actual_positives:{total_actual_positives}')
         print(f'Test Accuracy: {accuracy:.4f}')
         print(f'Test Precision: {avg_precision:.4f}, precision:{np.array2string(precision, precision=3, suppress_small=True)}')
         print(f'Test Recall: {avg_recall:.4f}, recall:{np.array2string(recall, precision=3, suppress_small=True)}')
