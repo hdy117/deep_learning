@@ -84,16 +84,16 @@ class CIFAR10_ViT(nn.Module):
         return x
 
 # hyper parameters
-learning_rate=2e-4
+learning_rate=1e-4
 eta_min=1e-5
-T_0=20
-n_epochs=2*T_0
-batch_size=300
+T_0=10
+n_epochs=6*T_0
+batch_size=350
 img_size=112
 num_classes=10
 torch_model_path=os.path.join(g_file_path,".","ViT_cifar10.pth")
 patch_size=16
-accumulate_steps=10
+accumulate_steps=8
 
 # transform for dataset
 transform = transforms.Compose([
