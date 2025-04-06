@@ -77,7 +77,7 @@ def test():
             batch_correct = (y_pred_bin == labels).float().sum().item()
             batch_total = N
 
-            # Precision and recall calculations, bigger than conf_thresh will make sure it is a true positive
+            # Precision and recall calculations
             true_positives = ((y_pred_bin==labels)*(y_pred_bin>0.5)).float().sum(dim=0).cpu()
             predicted_positives = y_pred_bin.sum(dim=0).cpu()
             actual_positives = labels.sum(dim=0).cpu()

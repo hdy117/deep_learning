@@ -39,7 +39,7 @@ class CIFAR10_ViT(nn.Module):
         self.embedding = nn.Linear(self.patch_pixel_num, self.d_model)   # embedding
         self.RoPE=RoPE.RotaryPositionalEncoding(dim=self.d_model)
         self.transfomer_encoder=nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=12, batch_first=True,
+            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=16, batch_first=True,
                                        activation='gelu',dim_feedforward=4*self.d_model,
                                        dropout=self.drop_out),
             num_layers=12
@@ -85,9 +85,9 @@ class CIFAR10_ViT(nn.Module):
 
 # hyper parameters
 learning_rate=2e-4
-eta_min=2e-6
-T_0=8
-n_epochs=3*T_0
+eta_min=1e-5
+T_0=20
+n_epochs=2*T_0
 batch_size=300
 img_size=112
 num_classes=10
@@ -123,7 +123,7 @@ cifar10_vit=cifar10_vit.to(device)
 # define train
 def train():
     # create tensorboard summary writter
-    summary_writer=SummaryWriter(log_dir=os.path.join(g_file_path,'log','vit_random_rotate'))
+    summary_writer=SummaryWriter(log_dir=os.path.join(g_file_path,'log','vit_16_heads'))
 
     # criterion
     criterion = nn.CrossEntropyLoss()
@@ -213,7 +213,7 @@ def train():
                 actual_positive+=labels.sum(dim=0).cpu()
                 # model predict positive
                 predict_positive+=y_pred_bin.sum(dim=0).cpu()
-                # model predict correctly positive, bigger than 0.5 will make sure it is a true positive
+                # model predict correctly positive
                 true_positive+=((y_pred_bin==labels)*(y_pred_bin>0.5)).float().sum(dim=0).cpu()
                 
             # Log the average test loss for this epoch
