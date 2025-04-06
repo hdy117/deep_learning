@@ -66,15 +66,7 @@ transform_no_resize = transforms.Compose([
     # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
 ])
 
-# 创建训练集
 data_dir = os.path.join(g_file_path,'OpenDataLab___CIFAR-10','raw','cifar-10-python','cifar-10-batches-py')
-train_dataset = CustomCIFAR10Dataset(data_dir, train=True, transform=transform)
-test_dataset = CustomCIFAR10Dataset(data_dir, train=False, transform=transform)
-
-# 创建数据加载器
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=32, shuffle=True)
-test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=True)
-
 
 def show_img(image, label):
     # 反归一化操作，恢复图像原始像素值范围
@@ -92,6 +84,14 @@ def show_img(image, label):
 
 
 if __name__=="__main__":
+    # 创建训练集
+    train_dataset = CustomCIFAR10Dataset(data_dir, train=True, transform=transform)
+    test_dataset = CustomCIFAR10Dataset(data_dir, train=False, transform=transform)
+
+    # 创建数据加载器
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=32, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=True)
+
     index = 12
     # 从数据集中获取一张图像和对应的标签
     image, label = train_dataset[index]  # 这里取索引为0的图像，你可以修改索引值
