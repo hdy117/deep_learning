@@ -39,7 +39,7 @@ class CIFAR10_ViT(nn.Module):
         self.embedding = nn.Linear(self.patch_pixel_num, self.d_model)   # embedding
         self.RoPE=RoPE.RotaryPositionalEncoding(dim=self.d_model)
         self.transfomer_encoder=nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=16, batch_first=True,
+            nn.TransformerEncoderLayer(d_model=self.d_model, nhead=12, batch_first=True,
                                        activation='gelu',dim_feedforward=4*self.d_model,
                                        dropout=self.drop_out),
             num_layers=12
@@ -84,16 +84,16 @@ class CIFAR10_ViT(nn.Module):
         return x
 
 # hyper parameters
-learning_rate=1e-4
-eta_min=1e-5
-T_0=10
-n_epochs=6*T_0
-batch_size=350
-img_size=112
+learning_rate=2e-4
+eta_min=2e-5
+T_0=5
+n_epochs=4*T_0
+batch_size=100
+img_size=224
 num_classes=10
 torch_model_path=os.path.join(g_file_path,".","ViT_cifar10.pth")
 patch_size=16
-accumulate_steps=8
+accumulate_steps=10
 
 # transform for dataset
 transform = transforms.Compose([
@@ -133,7 +133,7 @@ def train():
 
     # scheduler
     # scheduler = torch.optim.lr_scheduler.StepLR(optimizer,step_size=lr_step_size, gamma=gamma)
-    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=n_epochs,eta_min=1e-5)
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer,T_max=n_epochs,eta_min=eta_min)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer=optimizer,T_0=T_0,eta_min=eta_min,T_mult=1)
 
     # load torch model
@@ -166,6 +166,7 @@ def train():
 
             # gradient descent
             if (idx+1)%accumulate_steps==0:
+                torch.nn.utils.clip_grad_norm_(cifar10_vit.parameters(), max_norm=2.5)
                 optimizer.step()    
                 optimizer.zero_grad()
 
