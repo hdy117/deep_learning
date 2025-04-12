@@ -73,6 +73,7 @@ def show_img(image, label):
     # mean = np.array([0.4914, 0.4822, 0.4465])
     # std = np.array([0.2023, 0.1994, 0.2010])
     image = image.numpy().transpose(1, 2, 0)  # 将通道维度移到最后
+    print(f'{image}')
     # image = image * std + mean
     image = np.clip(image, 0, 1)  # 确保像素值在[0, 1]之间
     print(f'image.shape:{image.shape}')

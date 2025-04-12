@@ -29,10 +29,10 @@ class CIFAR10_ViT(nn.Module):
         self.drop_out=0.1
         
         self.patch_size=patch_size   # row/column of a patch, 16
-        self.patch_num=(self.img_w//self.patch_size)*(self.img_h//self.patch_size) # total patch number, 7*7-->49
-        self.patch_pixel_num=self.img_channel*self.patch_size*self.patch_size # pixel number in a patch, 3*16*16-->768
+        self.patch_num=(self.img_w//self.patch_size)*(self.img_h//self.patch_size) # total patch number, 8*8-->64
+        self.patch_pixel_num=self.img_channel*self.patch_size*self.patch_size # pixel number in a patch, 3*8*8-->128
         self.num_classes=num_classes    # number of class, 10
-        self.d_model=max(768,self.patch_pixel_num) # make sure d_model is not less than 768
+        self.d_model=768 # d_model set to 768
         
         self.class_token = nn.Parameter(torch.randn(1, 1, self.d_model))  # 添加分类标记
         
@@ -47,15 +47,11 @@ class CIFAR10_ViT(nn.Module):
 
         # mapping feature to 10 at the end
         self.fc = nn.Sequential(
-            nn.Linear(self.d_model, 1024),
-            nn.BatchNorm1d(1024),
+            nn.Linear(self.d_model, 4*self.d_model),
+            nn.LayerNorm(4*self.d_model),
             nn.GELU(),
             nn.Dropout(self.drop_out),
-            nn.Linear(1024, 1024),
-            nn.BatchNorm1d(1024),
-            nn.GELU(),
-            nn.Dropout(self.drop_out),
-            nn.Linear(1024, self.num_classes),
+            nn.Linear(4*self.d_model, self.num_classes),
         )
 
     def forward(self, x:torch.Tensor):
@@ -84,22 +80,26 @@ class CIFAR10_ViT(nn.Module):
         return x
 
 # hyper parameters
-learning_rate=2e-4
-eta_min=2e-5
+learning_rate=1e-4
+eta_min=1e-5
 T_0=5
-n_epochs=4*T_0
+n_epochs=2*T_0
+n_epochs=10
+lr_step_size=n_epochs//2
+gamma=0.1
 batch_size=100
 img_size=224
 num_classes=10
 torch_model_path=os.path.join(g_file_path,".","ViT_cifar10.pth")
 patch_size=16
-accumulate_steps=10
+accumulate_steps=60
 
 # transform for dataset
 transform = transforms.Compose([
-    transforms.RandomRotation(15),
+    transforms.RandomRotation(45),
     transforms.ToTensor(),
-    transforms.Resize((img_size,img_size),interpolation=torchvision.transforms.InterpolationMode.BICUBIC)
+    transforms.Resize((img_size,img_size),interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
+    transforms.Normalize(mean= [0.4914, 0.4822, 0.4465], std=[0.2470, 0.2435, 0.2616])
 ])
 
 # train dataset
@@ -109,7 +109,8 @@ train_loader = torch.utils.data.DataLoader(dataset=train_dataset,batch_size=batc
 # transform for dataset
 transform_no_rotation = transforms.Compose([
     transforms.ToTensor(),
-    transforms.Resize((img_size,img_size),interpolation=torchvision.transforms.InterpolationMode.BICUBIC)
+    transforms.Resize((img_size,img_size),interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
+    transforms.Normalize(mean= [0.4914, 0.4822, 0.4465], std=[0.2470, 0.2435, 0.2616])
 ])
 
 # test dataset and dataloader
@@ -123,13 +124,14 @@ cifar10_vit=cifar10_vit.to(device)
 # define train
 def train():
     # create tensorboard summary writter
-    summary_writer=SummaryWriter(log_dir=os.path.join(g_file_path,'log','vit_16_heads'))
+    summary_writer=SummaryWriter(log_dir=os.path.join(g_file_path,'log','vit_224'))
 
     # criterion
     criterion = nn.CrossEntropyLoss()
 
     # optimizer
-    optimizer = torch.optim.Adam(cifar10_vit.parameters(), lr=learning_rate, weight_decay=5e-4)
+    # optimizer = torch.optim.Adam(cifar10_vit.parameters(), lr=learning_rate, weight_decay=5e-4)
+    optimizer = torch.optim.AdamW(cifar10_vit.parameters(), lr=learning_rate, weight_decay=5e-4)
 
     # scheduler
     # scheduler = torch.optim.lr_scheduler.StepLR(optimizer,step_size=lr_step_size, gamma=gamma)
@@ -166,7 +168,7 @@ def train():
 
             # gradient descent
             if (idx+1)%accumulate_steps==0:
-                torch.nn.utils.clip_grad_norm_(cifar10_vit.parameters(), max_norm=2.5)
+                torch.nn.utils.clip_grad_norm_(cifar10_vit.parameters(), max_norm=1.0)
                 optimizer.step()    
                 optimizer.zero_grad()
 
@@ -174,7 +176,8 @@ def train():
             pred_label = torch.argmax(y_pred, dim=1)
             n_total += y_pred.shape[0]
             n_correct += (pred_label == labels).sum().item()
-            if (idx+1)%10==0:
+            divider=max(10,accumulate_steps)
+            if (idx+1)%divider==0:
                 print(f'pred_label[0]:{pred_label[0]}, labels[0]:{labels[0]}')
                 print(f'epoch:{epoch}, batch idx:{idx}, loss:{loss.item()}, accuracy:{n_correct / n_total}, n_total:{n_total}, n_correct:{n_correct}')
         
