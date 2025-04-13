@@ -21,7 +21,7 @@ import RoPE
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class CIFAR10_ViT(nn.Module):
-    def __init__(self,img_channel:int=3,img_size=[112,112], patch_size:int=16, num_classes=10):
+    def __init__(self,img_channel:int=3,img_size=[64,64], patch_size:int=8, num_classes=10):
         super().__init__()  
         self.img_w=img_size[0]
         self.img_h=img_size[1]
@@ -32,7 +32,7 @@ class CIFAR10_ViT(nn.Module):
         self.patch_num=(self.img_w//self.patch_size)*(self.img_h//self.patch_size) # total patch number, 8*8-->64
         self.patch_pixel_num=self.img_channel*self.patch_size*self.patch_size # pixel number in a patch, 3*8*8-->128
         self.num_classes=num_classes    # number of class, 10
-        self.d_model=768 # d_model set to 768
+        self.d_model=min(12*self.patch_num,768) # d_model set to 768
         
         self.class_token = nn.Parameter(torch.randn(1, 1, self.d_model))  # 添加分类标记
         
@@ -51,7 +51,11 @@ class CIFAR10_ViT(nn.Module):
             nn.LayerNorm(4*self.d_model),
             nn.GELU(),
             nn.Dropout(self.drop_out),
-            nn.Linear(4*self.d_model, self.num_classes),
+            nn.Linear(4*self.d_model, self.d_model),
+            nn.LayerNorm(self.d_model),
+            nn.GELU(),
+            nn.Dropout(self.drop_out),
+            nn.Linear(self.d_model, self.num_classes),
         )
 
     def forward(self, x:torch.Tensor):
@@ -82,17 +86,17 @@ class CIFAR10_ViT(nn.Module):
 # hyper parameters
 learning_rate=1e-4
 eta_min=1e-5
-T_0=5
-n_epochs=2*T_0
-n_epochs=10
-lr_step_size=n_epochs//2
+T_0=10
+n_epochs=10*T_0
+# n_epochs=10
+# lr_step_size=n_epochs//2
 gamma=0.1
 batch_size=100
 img_size=224
 num_classes=10
 torch_model_path=os.path.join(g_file_path,".","ViT_cifar10.pth")
 patch_size=16
-accumulate_steps=60
+accumulate_steps=30
 
 # transform for dataset
 transform = transforms.Compose([
@@ -131,7 +135,7 @@ def train():
 
     # optimizer
     # optimizer = torch.optim.Adam(cifar10_vit.parameters(), lr=learning_rate, weight_decay=5e-4)
-    optimizer = torch.optim.AdamW(cifar10_vit.parameters(), lr=learning_rate, weight_decay=5e-4)
+    optimizer = torch.optim.Adam(cifar10_vit.parameters(), lr=learning_rate, weight_decay=5e-4)
 
     # scheduler
     # scheduler = torch.optim.lr_scheduler.StepLR(optimizer,step_size=lr_step_size, gamma=gamma)
