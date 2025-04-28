@@ -20,6 +20,38 @@ import RoPE
 # device
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len=5000):
+        """
+        Args:
+            d_model: The dimensionality of the embeddings.
+            max_len: The maximum sequence length.
+        """
+        super(PositionalEncoding, self).__init__()
+        
+        # Create a matrix of shape (max_len, d_model) to store positional encodings
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)  # Shape: (max_len, 1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-torch.log(torch.tensor(10000.0)) / d_model))
+        
+        # Apply sine to even indices and cosine to odd indices
+        pe[:, 0::2] = torch.sin(position * div_term)  # Even indices
+        pe[:, 1::2] = torch.cos(position * div_term)  # Odd indices
+        
+        # Add a batch dimension and register as a buffer (non-trainable parameter)
+        pe = pe.unsqueeze(0)  # Shape: (1, max_len, d_model)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        """
+        Args:
+            x: Input tensor of shape (batch_size, seq_len, d_model).
+        Returns:
+            Tensor with positional encodings added to the input.
+        """
+        seq_len = x.size(1)
+        return x + self.pe[:, :seq_len, :]
+
 class CIFAR10_ViT(nn.Module):
     def __init__(self,img_channel:int=3,img_size=[64,64], patch_size:int=8, num_classes=10):
         super().__init__()  
@@ -37,7 +69,8 @@ class CIFAR10_ViT(nn.Module):
         self.class_token = nn.Parameter(torch.randn(1, 1, self.d_model))  # 添加分类标记
         
         self.embedding = nn.Linear(self.patch_pixel_num, self.d_model)   # embedding
-        self.RoPE=RoPE.RotaryPositionalEncoding(dim=self.d_model)
+        # self.RoPE=RoPE.RotaryPositionalEncoding(dim=self.d_model)
+        self.positional_encoding = PositionalEncoding(d_model=self.d_model, max_len=self.patch_num+1) # +1 for class token
         self.transfomer_encoder=nn.TransformerEncoder(
             nn.TransformerEncoderLayer(d_model=self.d_model, nhead=12, batch_first=True,
                                        activation='gelu',dim_feedforward=4*self.d_model,
@@ -70,7 +103,8 @@ class CIFAR10_ViT(nn.Module):
         x=self.embedding(x) # self.patch_pixel_num --> d_model
         class_tokens = self.class_token.expand(x.size(0), -1, -1) # add class token to capture global information
         x = torch.cat((class_tokens, x), dim=1)  # concat class_token and embedding
-        x=self.RoPE(x)  # positional encoding
+        # x=self.RoPE(x)  # positional encoding
+        x=self.positional_encoding(x) # add positional encoding
         
         # transformer encoder
         x=self.transfomer_encoder(x)
@@ -86,21 +120,21 @@ class CIFAR10_ViT(nn.Module):
 # hyper parameters
 learning_rate=1e-4
 eta_min=1e-5
-T_0=10
-n_epochs=10*T_0
-# n_epochs=10
-# lr_step_size=n_epochs//2
+T_0=5
+n_epochs=5*T_0
+# n_epochs=30
+# lr_step_size=n_epochs//1
 gamma=0.1
-batch_size=100
-img_size=224
+batch_size=300
+img_size=64
 num_classes=10
 torch_model_path=os.path.join(g_file_path,".","ViT_cifar10.pth")
-patch_size=16
-accumulate_steps=30
+patch_size=8
+accumulate_steps=10
 
 # transform for dataset
 transform = transforms.Compose([
-    transforms.RandomRotation(45),
+    transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
     transforms.Resize((img_size,img_size),interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
     transforms.Normalize(mean= [0.4914, 0.4822, 0.4465], std=[0.2470, 0.2435, 0.2616])
@@ -128,7 +162,7 @@ cifar10_vit=cifar10_vit.to(device)
 # define train
 def train():
     # create tensorboard summary writter
-    summary_writer=SummaryWriter(log_dir=os.path.join(g_file_path,'log','vit_224'))
+    summary_writer=SummaryWriter(log_dir=os.path.join(g_file_path,'log','vit_64'))
 
     # criterion
     criterion = nn.CrossEntropyLoss()
