@@ -18,12 +18,6 @@ def loss_function(recon_x, x, mu, logvar):
     KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
     return BCE + KLD
 
-# -------------------------
-# One-hot encoding for labels
-# -------------------------
-def one_hot(labels, num_classes=10):
-    return F.one_hot(labels, num_classes).float()
-
 def train(epoch):
     model.train()
     train_loss = 0

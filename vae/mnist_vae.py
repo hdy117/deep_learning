@@ -62,5 +62,10 @@ class CVAE(nn.Module):
         z = self.reparameterize(mu, logvar)
         return self.decode(z, y), mu, logvar
 
+# -------------------------
+# One-hot encoding for labels
+# -------------------------
+def one_hot(labels, num_classes=10):
+    return F.one_hot(labels, num_classes).float()
 
 
