@@ -9,14 +9,14 @@ class DDPM(nn.Module):
     def __init__(self, T=10, beta_start=1e-4, beta_end=2e-2,device='cuda' if torch.cuda.is_available() else 'cpu'):
         super(DDPM, self).__init__()
         self.device=device
-        self.T=T
-        self.beta_start=beta_start
-        self.beta_end=beta_end
-        self.betas=torch.linspace(self.beta_start, self.beta_end, self.T, device=self.device)
-        self.alpha = 1 - self.betas
-        self.alpha_bar=torch.cumprod(self.alpha, dim=0)
-        self.sqrt_alpha_bar=torch.sqrt(self.alpha_bar)
-        self.sqrt_one_minux_alpha_bar=torch.sqrt(1-self.alpha_bar)
+        self.T=T    # total number of diffusion forward steps
+        self.beta_start=beta_start  # start nosie variance
+        self.beta_end=beta_end  # end nosie variance
+        self.betas=torch.linspace(self.beta_start, self.beta_end, self.T, device=self.device) # linear step sample from beta_start to beta_end to get variance
+        self.alpha = 1 - self.betas # alpha_t = 1 - beta_t
+        self.alpha_bar=torch.cumprod(self.alpha, dim=0) # cumulative product of alpha_t
+        self.sqrt_alpha_bar=torch.sqrt(self.alpha_bar) # ratio to keep the original image, biiger step means less origin image
+        self.sqrt_one_minux_alpha_bar=torch.sqrt(1-self.alpha_bar) # ratio to add noise, bigger step means more noise added
         
     
     def ddpm_forward_step(self, x:torch.Tensor, t:int=0):

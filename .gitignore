@@ -8,6 +8,7 @@
 *.tar.gz
 *.idea
 *.vscode
+*.pt
 build*
 onnx/*
 dataset/*
