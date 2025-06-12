@@ -11,8 +11,8 @@ import math
 import os
 
 # 设置随机种子以确保结果可复现
-torch.manual_seed(42)
-np.random.seed(42)
+# torch.manual_seed(42)
+# np.random.seed(42)
 
 # 检查是否有可用的GPU
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -97,6 +97,7 @@ class UPSampleBlock(nn.Module):
         self.feature_dim=feature_dim
     
     def forward(self, x, skip_connection, t):
+        # print(f'UPSampleBlock before tran_conv2d: x.shape={x.shape}, skip_connection.shape={skip_connection.shape}, self.feature_dim={self.feature_dim}')
         x=self.tran_conv2d(x)
         x= torch.cat([x, skip_connection], dim=1)  # 拼接跳跃连接
         x=self.double_conv(x, t)
@@ -114,9 +115,12 @@ class UNet(nn.Module):
             nn.ReLU()
         )
         
-        self.out_channels = out_channels
-        self.hidden_channels = hidden_channels
-        self.in_channels = in_channels
+        # init conv
+        self.init_conv=nn.Sequential(
+            nn.Conv2d(in_channels, hidden_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(hidden_channels),
+            nn.ReLU(),
+        )
         
         # down sample blocks
         self.down_smaple_blocks=nn.ModuleList()
@@ -125,10 +129,11 @@ class UNet(nn.Module):
         self.up_sample_blocks=nn.ModuleList()
         
         # adding down/up sample blocks
-        feature_dims=[64,128,256,512]
+        feature_dims=[128,256,512]
+        feature_dim_in=hidden_channels
         for feataure in feature_dims:
-            self.down_smaple_blocks.append(DoubleConv(in_channels,feataure,time_emb_dim))
-            in_channels=feataure
+            self.down_smaple_blocks.append(DoubleConv(feature_dim_in,feataure,time_emb_dim))
+            feature_dim_in=feataure
         
         for feature in reversed(feature_dims):
             self.up_sample_blocks.append(UPSampleBlock(feature, time_emb_dim))
@@ -137,7 +142,7 @@ class UNet(nn.Module):
         self.bottle_neck=DoubleConv(feature_dims[-1],feature_dims[-1]*2,time_emb_dim)
         
         # 输出层
-        self.out = nn.Conv2d(hidden_channels, self.out_channels, 1)
+        self.out = nn.Conv2d(feature_dims[0], out_channels, 1)
         
         # down sample max pooling
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
@@ -145,6 +150,9 @@ class UNet(nn.Module):
     def forward(self, x, time):
         # 时间嵌入
         t = self.time_mlp(time)
+        
+        # init conv
+        x=self.init_conv(x)  # 初始卷积层
         
         #skip connections
         skip_connections = []
@@ -303,8 +311,8 @@ def train_ddpm(model, dataloader, optimizer, num_epochs, device, save_dir='./mod
         torch.save(model.state_dict(), f"{save_dir}/ddpm_epoch_{epoch+1}.pt")
         
         # 每5个epoch生成一些样本
-        if (epoch + 1) % 5 == 0:
-            generate_samples(model, epoch+1, device)
+        # if (epoch + 1) % 5 == 0:
+        #     generate_samples(model, epoch+1, device)
     
     torch.save(model.state_dict(), f"{save_dir}/ddpm_epoch.pt")
     
@@ -362,7 +370,7 @@ def main():
     ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
     
     # 定义优化器
-    optimizer = torch.optim.Adam(ddpm.parameters(), lr=1e-4)
+    optimizer = torch.optim.Adam(ddpm.parameters(), lr=1e-4,weight_decay=1e-3)
     
     # 训练模型
     losses = train_ddpm(ddpm, train_dataloader, optimizer, num_epochs=5, device=device)
