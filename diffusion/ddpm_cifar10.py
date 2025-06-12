@@ -308,7 +308,7 @@ def train_ddpm(model, dataloader, optimizer, num_epochs, device, save_dir='./mod
         print(f"Epoch {epoch+1}/{num_epochs}, Average Loss: {avg_loss:.6f}")
         
         # 每个epoch保存模型
-        torch.save(model.state_dict(), f"{save_dir}/ddpm_epoch_{epoch+1}.pt")
+        # torch.save(model.state_dict(), f"{save_dir}/ddpm_epoch_{epoch+1}.pt")
         
         # 每5个epoch生成一些样本
         # if (epoch + 1) % 5 == 0:
