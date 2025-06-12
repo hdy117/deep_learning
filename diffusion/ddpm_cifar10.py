@@ -62,24 +62,44 @@ class ResidualBlock(nn.Module):
         # 添加残差连接
         return self.relu(h + self.residual(x))
 
-# 定义下采样块
-class Downsample(nn.Module):
-    def __init__(self, channels):
+class DoubleConv(nn.Module):
+    """(Conv => ReLU => BN) * 2"""
+    def __init__(self, in_channels, out_channels,time_emb_dim):
         super().__init__()
-        self.max_pool_2d = nn.MaxPool2d(2, stride=2)
+        self.time_mlp = nn.Linear(time_emb_dim, out_channels)
+        self.double_conv = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(),
 
-    def forward(self, x):
-        return self.max_pool_2d(x)
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU()
+        )
+        self.relu=nn.ReLU()
 
-# 定义上采样块
-class Upsample(nn.Module):
-    def __init__(self, in_channels, out_channels):
+    def forward(self, x, t):
+        # 添加时间嵌入
+        time_emb = self.relu(self.time_mlp(t))
+        # 调整时间嵌入的维度以匹配特征图
+        time_emb = time_emb[(..., ) + (None, ) * 2]
+        
+        # 应用双卷积层
+        h = self.double_conv(x)
+        x=h+time_emb
+        return self.relu(h)
+
+class UPSampleBlock(nn.Module):
+    def __init__(self, feature_dim, time_emb_dim):
         super().__init__()
-        # 转置卷积进行上采样
-        self.transpose_conv = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2, padding=0)
-
-    def forward(self, x):
-        x = self.transpose_conv(x)
+        self.tran_conv2d=nn.ConvTranspose2d(feature_dim*2, feature_dim, kernel_size=2, stride=2)
+        self.double_conv = DoubleConv(feature_dim*2, feature_dim, time_emb_dim)
+        self.feature_dim=feature_dim
+    
+    def forward(self, x, skip_connection, t):
+        x=self.tran_conv2d(x)
+        x= torch.cat([x, skip_connection], dim=1)  # 拼接跳跃连接
+        x=self.double_conv(x, t)
         return x
 
 # 定义完整的U-Net模型
@@ -94,69 +114,53 @@ class UNet(nn.Module):
             nn.ReLU()
         )
         
-        # 初始卷积
-        self.init_conv = nn.Conv2d(in_channels, hidden_channels, 3, padding=1)
+        self.out_channels = out_channels
+        self.hidden_channels = hidden_channels
+        self.in_channels = in_channels
         
-        # 下采样部分
-        self.down1 = ResidualBlock(hidden_channels, hidden_channels, time_emb_dim)
-        self.downsample1 = Downsample(hidden_channels)
+        # down sample blocks
+        self.down_smaple_blocks=nn.ModuleList()
         
-        self.down2 = ResidualBlock(hidden_channels, hidden_channels * 2, time_emb_dim)
-        self.downsample2 = Downsample(hidden_channels * 2)
+        # up sample blocks
+        self.up_sample_blocks=nn.ModuleList()
         
-        self.down3 = ResidualBlock(hidden_channels * 2, hidden_channels * 4, time_emb_dim)
-        self.downsample3 = Downsample(hidden_channels * 4)
+        # adding down/up sample blocks
+        feature_dims=[64,128,256,512]
+        for feataure in feature_dims:
+            self.down_smaple_blocks.append(DoubleConv(in_channels,feataure,time_emb_dim))
+            in_channels=feataure
         
-        # 瓶颈
-        self.bottleneck1 = ResidualBlock(hidden_channels * 4, hidden_channels * 4, time_emb_dim)
-        self.bottleneck2 = ResidualBlock(hidden_channels * 4, hidden_channels * 4, time_emb_dim)
+        for feature in reversed(feature_dims):
+            self.up_sample_blocks.append(UPSampleBlock(feature, time_emb_dim))
         
-        # 上采样部分
-        self.upsample1 = Upsample(hidden_channels * 4, hidden_channels * 4)
-        self.up1 = ResidualBlock(hidden_channels * 8, hidden_channels * 2, time_emb_dim)
-        
-        self.upsample2 = Upsample(hidden_channels * 2, hidden_channels * 2)
-        self.up2 = ResidualBlock(hidden_channels * 4, hidden_channels, time_emb_dim)
-        
-        self.upsample3 = Upsample(hidden_channels, hidden_channels)
-        self.up3 = ResidualBlock(hidden_channels * 2, hidden_channels, time_emb_dim)
+        # bottle neck
+        self.bottle_neck=DoubleConv(feature_dims[-1],feature_dims[-1]*2,time_emb_dim)
         
         # 输出层
-        self.out = nn.Conv2d(hidden_channels, out_channels, 1)
+        self.out = nn.Conv2d(hidden_channels, self.out_channels, 1)
+        
+        # down sample max pooling
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
     def forward(self, x, time):
         # 时间嵌入
         t = self.time_mlp(time)
         
-        # 初始卷积
-        x1 = self.init_conv(x)
+        #skip connections
+        skip_connections = []
         
-        # 下采样路径
-        x2 = self.down1(x1, t)
-        x3 = self.downsample1(x2)
+        # down sampling
+        for bolck in self.down_smaple_blocks:
+            x = bolck(x, t)
+            skip_connections.append(x)
+            x=self.pool(x)  # 下采样
         
-        x3 = self.down2(x3, t)
-        x4 = self.downsample2(x3)
+        skip_connections=list(reversed(skip_connections))  # 反转以便在上采样时使用
+        x=self.bottle_neck(x, t)  # 瓶颈层
         
-        x4 = self.down3(x4, t)
-        x = self.downsample3(x4)
-        
-        # 瓶颈
-        x = self.bottleneck1(x, t)
-        x = self.bottleneck2(x, t)
-        
-        # 上采样路径（包含跳跃连接）
-        x = self.upsample1(x)
-        x = torch.cat([x, x4], dim=1)
-        x = self.up1(x, t)
-        
-        x = self.upsample2(x)
-        x = torch.cat([x, x3], dim=1)
-        x = self.up2(x, t)
-        
-        x = self.upsample3(x)
-        x = torch.cat([x, x2], dim=1)
-        x = self.up3(x, t)
+        # up sampling
+        for i, bock in enumerate(self.up_sample_blocks):
+            x = bock(x,skip_connections[i],t)
         
         # 输出层
         return self.out(x)
