@@ -365,7 +365,7 @@ def main():
     optimizer = torch.optim.Adam(ddpm.parameters(), lr=1e-4)
     
     # 训练模型
-    losses = train_ddpm(ddpm, train_dataloader, optimizer, num_epochs=10, device=device)
+    losses = train_ddpm(ddpm, train_dataloader, optimizer, num_epochs=5, device=device)
     
     # 绘制损失曲线
     plt.figure(figsize=(10, 5))
