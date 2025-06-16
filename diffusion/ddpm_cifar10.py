@@ -363,7 +363,7 @@ def main():
     
     # 加载CIFAR-10数据集
     train_dataset = torchvision.datasets.CIFAR10(root='../dataset', train=True, download=True, transform=transform)
-    train_dataloader = DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=4)
+    train_dataloader = DataLoader(train_dataset, batch_size=1024, shuffle=True, num_workers=4)
     
     # 初始化模型
     unet = UNet(in_channels=3, out_channels=3, hidden_channels=64).to(device)
