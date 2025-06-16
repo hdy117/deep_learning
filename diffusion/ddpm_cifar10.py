@@ -41,17 +41,17 @@ class ResidualBlock(nn.Module):
         self.bnorm1 = nn.BatchNorm2d(out_channels)
         self.conv2 = nn.Conv2d(out_channels, out_channels, 3, padding=1)
         self.bnorm2 = nn.BatchNorm2d(out_channels)
-        self.relu = nn.ReLU()
+        self.gelu = nn.GELU()
         
         # 如果输入输出通道数不同，添加跳跃连接
         self.residual = nn.Conv2d(in_channels, out_channels, 1) if in_channels != out_channels else nn.Identity()
 
     def forward(self, x, time_emb):
         # 应用第一个卷积层
-        h = self.relu(self.bnorm1(self.conv1(x)))
+        h = self.gelu(self.bnorm1(self.conv1(x)))
         
         # 添加时间嵌入
-        time_emb = self.relu(self.time_mlp(time_emb))
+        time_emb = self.gelu(self.time_mlp(time_emb))
         # 调整时间嵌入的维度以匹配特征图
         time_emb = time_emb[(..., ) + (None, ) * 2]
         h = h + time_emb
@@ -60,34 +60,34 @@ class ResidualBlock(nn.Module):
         h = self.bnorm2(self.conv2(h))
         
         # 添加残差连接
-        return self.relu(h + self.residual(x))
+        return self.gelu(h + self.residual(x))
 
 class DoubleConv(nn.Module):
-    """(Conv => ReLU => BN) * 2"""
+    """(Conv => GELU => BN) * 2"""
     def __init__(self, in_channels, out_channels,time_emb_dim):
         super().__init__()
         self.time_mlp = nn.Linear(time_emb_dim, out_channels)
         self.double_conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(),
+            nn.GELU(),
 
             nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU()
+            nn.GELU()
         )
-        self.relu=nn.ReLU()
+        self.gelu=nn.GELU()
 
     def forward(self, x, t):
         # 添加时间嵌入
-        time_emb = self.relu(self.time_mlp(t))
+        time_emb = self.gelu(self.time_mlp(t))
         # 调整时间嵌入的维度以匹配特征图
         time_emb = time_emb[(..., ) + (None, ) * 2]
         
         # 应用双卷积层
         h = self.double_conv(x)
         x=h+time_emb
-        return self.relu(h)
+        return self.gelu(h)
 
 class UPSampleBlock(nn.Module):
     def __init__(self, feature_dim, time_emb_dim):
@@ -112,14 +112,14 @@ class UNet(nn.Module):
         self.time_mlp = nn.Sequential(
             SinusoidalPositionEmbeddings(time_emb_dim),
             nn.Linear(time_emb_dim, time_emb_dim),
-            nn.ReLU()
+            nn.GELU()
         )
         
         # init conv
         self.init_conv=nn.Sequential(
             nn.Conv2d(in_channels, hidden_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(hidden_channels),
-            nn.ReLU(),
+            nn.GELU(),
         )
         
         # down sample blocks
