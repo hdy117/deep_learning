@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 import numpy as np
+import os
 
 # --- Dataset ---
 transform = transforms.Compose([
@@ -74,6 +75,10 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 model = VAE().to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
+if os.path.exists('./cifar10_vae.pth'):
+    print("Loading existing model...")
+    model.load_state_dict(torch.load('./cifar10_vae.pth'))
+
 print("Training VAE...")
 for epoch in range(10):
     model.train()
@@ -87,6 +92,12 @@ for epoch in range(10):
         optimizer.step()
         total_loss += loss.item()
     print(f"Epoch {epoch+1}, Loss: {total_loss / len(loader.dataset):.4f}")
+    
+# save the model
+torch.save(model.state_dict(), './cifar10_vae.pth')
+
+# load the model
+model.load_state_dict(torch.load('./cifar10_vae.pth'))
 
 # --- Visualization: 2D t-SNE latent space ---
 print("Extracting latent vectors for t-SNE...")
@@ -105,7 +116,7 @@ latents = torch.cat(latents).numpy()
 labels = torch.cat(labels).numpy()
 
 print("Running t-SNE...")
-tsne = TSNE(n_components=2, perplexity=30, n_iter=1000)
+tsne = TSNE(n_components=2, perplexity=30)
 z_tsne = tsne.fit_transform(latents)
 
 plt.figure(figsize=(8, 6))
