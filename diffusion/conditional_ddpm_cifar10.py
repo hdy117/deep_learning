@@ -381,11 +381,11 @@ def main():
     unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
     ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
     
-    num_epochs = 5
+    num_epochs = 40
 
     # 定义优化器
     optimizer = torch.optim.Adam(ddpm.parameters(), lr=2e-4,weight_decay=1e-3)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer,T_max=num_epochs,eta_min=5e-5)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer=optimizer,T_0=10,eta_min=5e-5)
     
     # 训练模型
     losses = train_ddpm(ddpm, train_dataloader, optimizer, scheduler=scheduler, num_epochs=num_epochs, device=device)
