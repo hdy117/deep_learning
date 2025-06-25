@@ -269,7 +269,13 @@ class DDPM(nn.Module):
         return self.p_sample_loop((batch_size, channels, image_size, image_size), label, device)
     
     def _extract(self, a, t, x_shape):
-        """从张量a中提取与时间步t对应的元素"""
+        """
+        a: 1D tensor, shape: [T]，例如 alphas、betas、sqrt_alphas_cumprod 等
+        t: 当前 batch 的时间步,shape: [batch_size]
+        x_shape: 目标输出的 shape,例如 [batch_size, C, H, W]
+        
+        返回：从 a 中按 t 提取值并 reshape 成 x_shape 的广播形状 [batch_size, 1, 1, 1]
+        """
         batch_size = t.shape[0]
         out = a.gather(-1, t.cpu())
         return out.reshape(batch_size, *((1,) * (len(x_shape) - 1))).to(t.device)
@@ -322,8 +328,8 @@ def train_ddpm(model, dataloader, optimizer, scheduler, num_epochs, device, save
         # 每个epoch保存模型
         # torch.save(model.state_dict(), f"{save_dir}/ddpm_epoch_{epoch+1}.pt")
         
-        # 每5个epoch生成一些样本
-        # if (epoch + 1) % 5 == 0:
+        # 每10个epoch生成一些样本
+        # if (epoch + 1) % 10 == 0:
         #     generate_samples(model, epoch+1, device)
     
     torch.save(model.state_dict(), f"{save_dir}/ddpm_epoch.pt")
