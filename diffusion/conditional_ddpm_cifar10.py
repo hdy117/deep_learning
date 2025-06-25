@@ -22,23 +22,23 @@ print(f"使用设备: {device}")
 class SinusoidalPositionEmbeddings(nn.Module):
     def __init__(self, dim):
         super().__init__()
-        self.dim = dim # dimension, must be an even nnumber
-        if not(self.dim%2==0):
-            raise f"{self.dim} is not an even number"
-
+        self.dim=dim
+        if not(self.dim%2)==0:
+            raise f'{self.dim} is not an even number'
+    
     def forward(self, time):
         '''
-        time: [batch_size]
+        time:[batch_size]
         '''
-        half_dim = self.dim // 2 # split dim into half, one for sin, the other for cos
-        embeddings = math.log(10000) / (half_dim - 1) # 1/(half_dim-1)*log(10000)
-        embeddings = torch.exp(torch.arange(half_dim, device=time.device) * -embeddings) # [0,1,2,..,half_dim-1]*(-1)/(half_dim-1)*log(10000)
-        embeddings = time[:, None] * embeddings[None, :] # [batch_size,1]*[1,half_dim] --> [batch_size, half_dim]
-        embeddings = torch.cat((embeddings.sin(), embeddings.cos()), dim=-1) # [batch_size,dim]
-        return embeddings
+        half_dim=self.dim//2 # half dim
+        omega=1.0/(10000**(torch.arange(0,half_dim,device=time.device)*1.0/(half_dim-1))) # 1/(10000**i/d) # [half_dim]
+        embedding=torch.exp(time[:,None]*omega[None,:]) # [batch_size, half_dim]
+        embedding=torch.concat([embedding.sin(), embedding.cos()],dim=-1) # [batch_size, dim]
+
+        return embedding
 
 class DoubleConv(nn.Module):
-    """(Conv => GELU => BN) * 2"""
+    """(Conv => BN => GELU) * 2"""
     def __init__(self, in_channels, out_channels,time_emb_dim):
         super().__init__()
         self.time_mlp = nn.Sequential(
@@ -56,11 +56,11 @@ class DoubleConv(nn.Module):
         )
         self.gelu=nn.GELU()
 
-    def forward(self, x, t):
-        # 添加时间嵌入
-        time_emb = self.time_mlp(t)
+    def forward(self, x, t_embeding):
+        # add time embedding
+        time_emb = self.time_mlp(t_embeding)
 
-        # 调整时间嵌入的维度以匹配特征图
+        # adjust dim of time embedding to use broadcast of torch
         time_emb = time_emb[...,None,None] # [batch_size, time_emb_dim] --> [batch_size, time_emb_dim, 1, 1]
 
         # add time embedding to input
