@@ -264,7 +264,7 @@ class DDPM(nn.Module):
     @torch.no_grad()
     def sample(self, image_size, batch_size=16, channels=3, device='cuda'):
         """生成新样本"""
-        label=torch.arange(0,10,(batch_size,),device=device)
+        label=torch.randint(0,10,(batch_size,),device=device)
         # print(f'label.shape:{label.shape}')
         return self.p_sample_loop((batch_size, channels, image_size, image_size), label, device)
     
@@ -381,7 +381,7 @@ def main():
     unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
     ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
     
-    num_epochs = 3
+    num_epochs = 5
 
     # 定义优化器
     optimizer = torch.optim.Adam(ddpm.parameters(), lr=2e-4,weight_decay=1e-3)
