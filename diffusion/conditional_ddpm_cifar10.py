@@ -24,7 +24,7 @@ class SinusoidalPositionEmbeddings(nn.Module):
         super().__init__()
         self.dim=dim
         if not(self.dim%2)==0:
-            raise f'{self.dim} is not an even number'
+            raise ValueError(f'{self.dim} is not an even number')
     
     def forward(self, time):
         '''
@@ -32,7 +32,7 @@ class SinusoidalPositionEmbeddings(nn.Module):
         '''
         half_dim=self.dim//2 # half dim
         omega=1.0/(10000**(torch.arange(0,half_dim,device=time.device)*1.0/(half_dim-1))) # 1/(10000**i/d) # [half_dim]
-        embedding=torch.exp(time[:,None]*omega[None,:]) # [batch_size, half_dim]
+        embedding=time[:,None]*omega[None,:] # [batch_size, half_dim]
         embedding=torch.concat([embedding.sin(), embedding.cos()],dim=-1) # [batch_size, dim]
 
         return embedding
