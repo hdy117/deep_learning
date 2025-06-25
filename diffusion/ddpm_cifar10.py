@@ -85,7 +85,7 @@ class DoubleConv(nn.Module):
         time_emb = time_emb[(..., ) + (None, ) * 2]
         
         # add time embedding to input
-        x=h+time_emb
+        x=x+time_emb
         
         # 应用双卷积层
         h = self.double_conv(x)
