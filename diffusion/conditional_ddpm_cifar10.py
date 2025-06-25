@@ -31,7 +31,7 @@ class SinusoidalPositionEmbeddings(nn.Module):
         time:[batch_size]
         '''
         half_dim=self.dim//2 # half dim
-        omega=1.0/(10000**(torch.arange(0,half_dim,device=time.device)*1.0/(half_dim-1))) # 1/(10000**i/d) # [half_dim]
+        omega=1.0/(10000.0**(torch.arange(0,half_dim,device=time.device)*1.0/(half_dim-1))) # 1/(10000**i/d) # [half_dim]
         embedding=time[:,None]*omega[None,:] # [batch_size, half_dim]
         embedding=torch.concat([embedding.sin(), embedding.cos()],dim=-1) # [batch_size, dim]
 
@@ -39,10 +39,14 @@ class SinusoidalPositionEmbeddings(nn.Module):
 
 class DoubleConv(nn.Module):
     """(Conv => BN => GELU) * 2"""
-    def __init__(self, in_channels, out_channels,time_emb_dim):
+    def __init__(self, in_channels, out_channels,time_emb_dim,label_emb_dim):
         super().__init__()
         self.time_mlp = nn.Sequential(
             nn.Linear(time_emb_dim, in_channels),
+            nn.GELU(),
+        )
+        self.label_mlp = nn.Sequential(
+            nn.Linear(label_emb_dim, in_channels),
             nn.GELU(),
         )
         self.double_conv = nn.Sequential(
@@ -56,15 +60,18 @@ class DoubleConv(nn.Module):
         )
         self.gelu=nn.GELU()
 
-    def forward(self, x, t_embeding):
-        # add time embedding
+    def forward(self, x, t_embeding, label_embeding):
+        # add time/label embedding
         time_emb = self.time_mlp(t_embeding)
+        label_emb=self.label_mlp(label_embeding)
 
         # adjust dim of time embedding to use broadcast of torch
         time_emb = time_emb[...,None,None] # [batch_size, time_emb_dim] --> [batch_size, time_emb_dim, 1, 1]
+        label_emb=label_emb[...,None,None] # [batch_size, time_emb_dim] --> [batch_size, label_emb_dim, 1, 1]
 
         # add time embedding to input
         x=x+time_emb
+        x=x+label_emb
         
         # 应用双卷积层
         h = self.double_conv(x)
@@ -72,28 +79,35 @@ class DoubleConv(nn.Module):
         return h
 
 class UPSampleBlock(nn.Module):
-    def __init__(self, feature_dim, time_emb_dim):
+    def __init__(self, feature_dim, time_emb_dim, label_emb_dim):
         super().__init__()
         self.tran_conv2d=nn.ConvTranspose2d(feature_dim*2, feature_dim, kernel_size=2, stride=2)
-        self.double_conv = DoubleConv(feature_dim*2, feature_dim, time_emb_dim)
+        self.double_conv = DoubleConv(feature_dim*2, feature_dim, time_emb_dim, label_emb_dim)
         self.feature_dim=feature_dim
     
-    def forward(self, x, skip_connection, t):
+    def forward(self, x, skip_connection, t, label):
         # print(f'UPSampleBlock before tran_conv2d: x.shape={x.shape}, skip_connection.shape={skip_connection.shape}, self.feature_dim={self.feature_dim}')
         x=self.tran_conv2d(x)
         x= torch.cat([x, skip_connection], dim=1)  # 拼接跳跃连接
-        x=self.double_conv(x, t)
+        x=self.double_conv(x, t, label)
         return x
 
 # 定义完整的U-Net模型
 class UNet(nn.Module):
-    def __init__(self, in_channels=3, out_channels=3, feature_dims=[64,128,256,512], time_emb_dim=256):
+    def __init__(self, in_channels=3, out_channels=3, feature_dims=[64,128,256,512], time_emb_dim=256, label_emb_dim=256):
         super().__init__()
         
         # 时间嵌入
         self.time_mlp = nn.Sequential(
             SinusoidalPositionEmbeddings(time_emb_dim),
             nn.Linear(time_emb_dim, time_emb_dim),
+            nn.GELU()
+        )
+
+        # label embedding
+        self.label_mlp = nn.Sequential(
+            SinusoidalPositionEmbeddings(label_emb_dim),
+            nn.Linear(label_emb_dim,label_emb_dim),
             nn.GELU()
         )
 
@@ -116,14 +130,14 @@ class UNet(nn.Module):
         # adding down/up sample blocks
         feature_dim_in=hidden_channels
         for feataure in feature_dims:
-            self.down_smaple_blocks.append(DoubleConv(feature_dim_in,feataure,time_emb_dim))
+            self.down_smaple_blocks.append(DoubleConv(feature_dim_in,feataure,time_emb_dim,label_emb_dim))
             feature_dim_in=feataure
         
         for feature in reversed(feature_dims):
-            self.up_sample_blocks.append(UPSampleBlock(feature, time_emb_dim))
+            self.up_sample_blocks.append(UPSampleBlock(feature, time_emb_dim,label_emb_dim))
         
         # bottle neck
-        self.bottle_neck=DoubleConv(feature_dims[-1],feature_dims[-1]*2,time_emb_dim)
+        self.bottle_neck=DoubleConv(feature_dims[-1],feature_dims[-1]*2,time_emb_dim, label_emb_dim)
         
         # 输出层
         self.out = nn.Conv2d(feature_dims[0], out_channels, 1)
@@ -131,9 +145,17 @@ class UNet(nn.Module):
         # down sample max pooling
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
-    def forward(self, x, time):
+    def forward(self, x, time, label):
+        '''
+        x:[batch_size,C,W,H],
+        time:[batch_size]
+        label:[batch_size]
+        '''
         # 时间嵌入
         t = self.time_mlp(time)
+
+        # label embedding
+        label_emb=self.label_mlp(label)
         
         # init conv
         x=self.init_conv(x)  # 初始卷积层
@@ -143,16 +165,16 @@ class UNet(nn.Module):
         
         # down sampling
         for bolck in self.down_smaple_blocks:
-            x = bolck(x, t)
+            x = bolck(x, t, label_emb)
             skip_connections.append(x)
             x=self.pool(x)  # 下采样
         
         skip_connections=list(reversed(skip_connections))  # 反转以便在上采样时使用
-        x=self.bottle_neck(x, t)  # 瓶颈层
+        x=self.bottle_neck(x, t, label_emb)  # 瓶颈层
         
         # up sampling
         for i, bock in enumerate(self.up_sample_blocks):
-            x = bock(x,skip_connections[i],t)
+            x = bock(x,skip_connections[i],t, label_emb)
         
         # 输出层
         return self.out(x)
@@ -188,13 +210,13 @@ class DDPM(nn.Module):
         
         return x_t, noise
     
-    def p_loss(self, x_0, t):
+    def p_loss(self, x_0, t, label):
         """训练损失:预测噪声并计算MSE损失"""
         noise = torch.randn_like(x_0)
         x_t, noise = self.forward_diffusion(x_0, t, noise)
         
         # 模型预测噪声
-        predicted_noise = self.model(x_t, t)
+        predicted_noise = self.model(x_t, t, label)
         
         # 计算MSE损失
         loss = F.mse_loss(predicted_noise, noise)
@@ -202,14 +224,14 @@ class DDPM(nn.Module):
         return loss
     
     @torch.no_grad()
-    def p_sample(self, x_t, t):
+    def p_sample(self, x_t, t, label):
         """从x_t采样x_{t-1}（单步去噪）"""
         betas_t = self._extract(self.betas, t, x_t.shape)
         sqrt_one_minus_alphas_cumprod_t = self._extract(self.sqrt_one_minus_alphas_cumprod, t, x_t.shape)
         sqrt_recip_alphas_t = self._extract(torch.sqrt(1.0 / self.alphas), t, x_t.shape)
         
         # 预测噪声
-        predicted_noise = self.model(x_t, t)
+        predicted_noise = self.model(x_t, t, label)
         
         # 公式: x_{t-1} = sqrt(1/beta_t) * (x_t - (1-alpha_t)/sqrt(1-alpha_cumprod_t) * predicted_noise) + sqrt(variance) * noise
         mean = sqrt_recip_alphas_t * (x_t - betas_t * predicted_noise / sqrt_one_minus_alphas_cumprod_t)
@@ -224,16 +246,16 @@ class DDPM(nn.Module):
         return sample
     
     @torch.no_grad()
-    def p_sample_loop(self, shape, device):
+    def p_sample_loop(self, shape, label, device):
         """完整的去噪过程:从随机噪声开始，逐步生成样本"""
-        b = shape[0]
+        batch_size = shape[0]
         # 从随机噪声开始
         img = torch.randn(shape, device=device)
         imgs = []
         
         for i in tqdm(reversed(range(0, self.num_diffusion_timesteps)), desc='Sampling'):
-            t = torch.full((b,), i, device=device, dtype=torch.long)
-            img = self.p_sample(img, t)
+            t = torch.full((batch_size,), i, device=device, dtype=torch.long)
+            img = self.p_sample(img, t, label)
             if (i + 1) % 100 == 0 or i == 0:  # 每100步保存一次中间结果
                 imgs.append(img.cpu().numpy())
             
@@ -242,7 +264,9 @@ class DDPM(nn.Module):
     @torch.no_grad()
     def sample(self, image_size, batch_size=16, channels=3, device='cuda'):
         """生成新样本"""
-        return self.p_sample_loop((batch_size, channels, image_size, image_size), device)
+        label=torch.arange(0,10,(batch_size,),device=device)
+        # print(f'label.shape:{label.shape}')
+        return self.p_sample_loop((batch_size, channels, image_size, image_size), label, device)
     
     def _extract(self, a, t, x_shape):
         """从张量a中提取与时间步t对应的元素"""
@@ -272,13 +296,16 @@ def train_ddpm(model, dataloader, optimizer, scheduler, num_epochs, device, save
             
             # 获取数据
             x_0 = batch[0].to(device)
+            label = batch[1].to(device).to(dtype=torch.float)
             batch_size = x_0.shape[0]
+            # print(f'label:{label}, label.shape:{label.shape}')
+            # print(f'x_0:{label}, x_0.shape:{x_0.shape}')
             
             # 随机采样时间步
             t = torch.randint(0, model.num_diffusion_timesteps, (batch_size,), device=device).long()
             
             # 计算损失
-            loss = model.p_loss(x_0, t)
+            loss = model.p_loss(x_0, t, label)
             
             # 反向传播
             loss.backward()
@@ -354,7 +381,7 @@ def main():
     unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
     ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
     
-    num_epochs = 10
+    num_epochs = 3
 
     # 定义优化器
     optimizer = torch.optim.Adam(ddpm.parameters(), lr=2e-4,weight_decay=1e-3)
