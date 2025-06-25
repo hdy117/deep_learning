@@ -84,9 +84,12 @@ class DoubleConv(nn.Module):
         # 调整时间嵌入的维度以匹配特征图
         time_emb = time_emb[(..., ) + (None, ) * 2]
         
+        # add time embedding to input
+        x=h+time_emb
+        
         # 应用双卷积层
         h = self.double_conv(x)
-        x=h+time_emb
+        
         return self.gelu(h)
 
 class UPSampleBlock(nn.Module):
