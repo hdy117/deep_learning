@@ -357,7 +357,7 @@ def main():
     num_epochs = 10
 
     # 定义优化器
-    optimizer = torch.optim.Adam(ddpm.parameters(), lr=2e-4,weight_decay=1e-3)
+    optimizer = torch.optim.Adam(ddpm.parameters(), lr=2e-4,weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer,T_max=num_epochs,eta_min=5e-5)
     
     # 训练模型

@@ -51,11 +51,11 @@ class DoubleConv(nn.Module):
         )
         self.double_conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
+            nn.GroupNorm(8,out_channels),
             nn.GELU(),
 
             nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
+            nn.GroupNorm(8,out_channels),
             nn.GELU()
         )
         self.gelu=nn.GELU()
@@ -110,6 +110,7 @@ class UNet(nn.Module):
             nn.Linear(label_emb_dim,label_emb_dim),
             nn.GELU()
         )
+        # self.label_mlp = nn.Embedding(num_embeddings=10,embedding_dim=label_emb_dim)
 
         hidden_channels=feature_dims[0]
         feature_dims=feature_dims[1:]
@@ -117,7 +118,7 @@ class UNet(nn.Module):
         # init conv
         self.init_conv=nn.Sequential(
             nn.Conv2d(in_channels, hidden_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(hidden_channels),
+            nn.GroupNorm(8,hidden_channels),
             nn.GELU(),
         )
         
@@ -140,7 +141,10 @@ class UNet(nn.Module):
         self.bottle_neck=DoubleConv(feature_dims[-1],feature_dims[-1]*2,time_emb_dim, label_emb_dim)
         
         # 输出层
-        self.out = nn.Conv2d(feature_dims[0], out_channels, 1)
+        self.out = nn.Sequential(
+            nn.Conv2d(feature_dims[0], out_channels, 1),
+            # nn.Tanh(),
+        )
         
         # down sample max pooling
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
@@ -302,7 +306,8 @@ def train_ddpm(model, dataloader, optimizer, scheduler, num_epochs, device, save
             
             # 获取数据
             x_0 = batch[0].to(device)
-            label = batch[1].to(device).to(dtype=torch.float)
+            # label = batch[1].to(device).to(dtype=torch.float)
+            label = batch[1].to(device)
             batch_size = x_0.shape[0]
             # print(f'label:{label}, label.shape:{label.shape}')
             # print(f'x_0:{label}, x_0.shape:{x_0.shape}')
@@ -326,11 +331,14 @@ def train_ddpm(model, dataloader, optimizer, scheduler, num_epochs, device, save
         print(f"Epoch {epoch+1}/{num_epochs}, Average Loss: {avg_loss:.6f}")
         
         # 每个epoch保存模型
-        # torch.save(model.state_dict(), f"{save_dir}/ddpm_epoch_{epoch+1}.pt")
+        if (epoch + 1) % 10 == 0:
+            torch.save(model.state_dict(), f"{save_dir}/ddpm_epoch.pt")
         
         # 每10个epoch生成一些样本
-        # if (epoch + 1) % 10 == 0:
-        #     generate_samples(model, epoch+1, device)
+        # with torch.no_grad():
+        #     if (epoch + 1) % 5 == 0:
+        #         samples, sample_steps=model.sample(image_size=32, batch_size=16, device=device)
+        #         save_images(samples, sample_steps, 16, epoch, './samples')
     
     torch.save(model.state_dict(), f"{save_dir}/ddpm_epoch.pt")
     
@@ -344,6 +352,8 @@ def generate_samples(model, epoch, device, n_samples=16, save_dir='./samples'):
     model.eval()
     samples, sample_steps = model.sample(image_size=32, batch_size=n_samples, device=device)
     
+    # save_images(samples, sample_steps, n_samples, epoch, save_dir)
+    # def save_images(samples, sample_steps, n_samples=16, epoch=10, save_dir='./samples'):
     # 保存最终样本
     plt.figure(figsize=(10, 10))
     for i in range(min(16, n_samples)):
@@ -371,6 +381,7 @@ def generate_samples(model, epoch, device, n_samples=16, save_dir='./samples'):
     plt.savefig(f"{save_dir}/denoising_process_epoch_{epoch}.png")
     plt.close()
 
+
 # 主函数
 def main():
     # 数据预处理
@@ -381,13 +392,13 @@ def main():
     
     # 加载CIFAR-10数据集
     train_dataset = torchvision.datasets.CIFAR10(root='../dataset', train=True, download=True, transform=transform)
-    train_dataloader = DataLoader(train_dataset, batch_size=1024, shuffle=True, num_workers=4)
+    train_dataloader = DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=4)
     
     # 初始化模型
     unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
     ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
     
-    num_epochs = 40
+    num_epochs = 10
 
     # 定义优化器
     optimizer = torch.optim.Adam(ddpm.parameters(), lr=2e-4,weight_decay=1e-3)
