@@ -69,9 +69,8 @@ class DoubleConv(nn.Module):
         time_emb = time_emb[...,None,None] # [batch_size, time_emb_dim] --> [batch_size, time_emb_dim, 1, 1]
         label_emb=label_emb[...,None,None] # [batch_size, time_emb_dim] --> [batch_size, label_emb_dim, 1, 1]
 
-        # add time embedding to input
-        x=x+time_emb
-        x=x+label_emb
+        # add time/label embedding to input
+        x=x+time_emb+label_emb
         
         # 应用双卷积层
         h = self.double_conv(x)
@@ -94,7 +93,7 @@ class UPSampleBlock(nn.Module):
 
 # 定义完整的U-Net模型
 class UNet(nn.Module):
-    def __init__(self, in_channels=3, out_channels=3, feature_dims=[64,128,256,512], time_emb_dim=128, label_emb_dim=128):
+    def __init__(self, in_channels=3, out_channels=3, feature_dims=[64,128,256,512], time_emb_dim=256, label_emb_dim=256):
         super().__init__()
         
         # 时间嵌入
@@ -110,11 +109,7 @@ class UNet(nn.Module):
         #     nn.Linear(label_emb_dim,label_emb_dim),
         #     nn.GELU()
         # )
-        # self.label_mlp = nn.Embedding(num_embeddings=10,embedding_dim=label_emb_dim)
-        # self.label_mlp = nn.Sequential(
-        #     nn.Linear(10,label_emb_dim),
-        #     nn.GELU(),
-        # )
+
         self.label_mlp = nn.Sequential(
             nn.Embedding(10,label_emb_dim),
             nn.GELU(),
@@ -410,9 +405,9 @@ def main():
     
     # 初始化模型
     unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
-    ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
+    ddpm = DDPM(model=unet, num_diffusion_timesteps=2000).to(device)
     
-    num_epochs = 100
+    num_epochs = 30
 
     # 定义优化器
     optimizer = torch.optim.Adam(ddpm.parameters(), lr=1e-4,weight_decay=1e-4)
