@@ -25,10 +25,13 @@ class VAE(nn.Module):
         # Encoder
         self.enc = nn.Sequential(
             nn.Conv2d(3, 32, 4, stride=2, padding=1),  # 32x16x16
+            nn.GroupNorm(4,32),
             nn.ReLU(),
             nn.Conv2d(32, 64, 4, stride=2, padding=1), # 64x8x8
+            nn.GroupNorm(4,64),
             nn.ReLU(),
             nn.Conv2d(64, 128, 4, stride=2, padding=1), # 128x4x4
+            nn.GroupNorm(4,128),
             nn.ReLU(),
         )
         self.fc_mu = nn.Linear(128*4*4, latent_dim)
@@ -71,7 +74,8 @@ def vae_loss(x_recon, x, mu, logvar):
     return recon_loss + kl
 
 # --- Training ---
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+torch.cuda.set_device(1)
+device = 'cuda:1' if torch.cuda.is_available() else 'cpu'
 model = VAE().to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 

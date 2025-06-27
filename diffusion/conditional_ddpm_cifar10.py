@@ -94,7 +94,7 @@ class UPSampleBlock(nn.Module):
 
 # 定义完整的U-Net模型
 class UNet(nn.Module):
-    def __init__(self, in_channels=3, out_channels=3, feature_dims=[64,128,256,512], time_emb_dim=256, label_emb_dim=256):
+    def __init__(self, in_channels=3, out_channels=3, feature_dims=[64,128,256,512], time_emb_dim=128, label_emb_dim=128):
         super().__init__()
         
         # 时间嵌入
@@ -111,8 +111,12 @@ class UNet(nn.Module):
         #     nn.GELU()
         # )
         # self.label_mlp = nn.Embedding(num_embeddings=10,embedding_dim=label_emb_dim)
+        # self.label_mlp = nn.Sequential(
+        #     nn.Linear(10,label_emb_dim),
+        #     nn.GELU(),
+        # )
         self.label_mlp = nn.Sequential(
-            nn.Linear(10,label_emb_dim),
+            nn.Embedding(10,label_emb_dim),
             nn.GELU(),
         )
 
@@ -171,8 +175,7 @@ class UNet(nn.Module):
         t = self.time_mlp(time)
 
         # label embedding
-        label_one_hot=self.one_hot(label)
-        label_emb=self.label_mlp(label_one_hot)
+        label_emb=self.label_mlp(label)
         
         # init conv
         x=self.init_conv(x)  # 初始卷积层
@@ -409,7 +412,7 @@ def main():
     unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
     ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
     
-    num_epochs = 50
+    num_epochs = 100
 
     # 定义优化器
     optimizer = torch.optim.Adam(ddpm.parameters(), lr=1e-4,weight_decay=1e-4)
