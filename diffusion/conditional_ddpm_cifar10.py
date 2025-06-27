@@ -110,7 +110,11 @@ class UNet(nn.Module):
         #     nn.Linear(label_emb_dim,label_emb_dim),
         #     nn.GELU()
         # )
-        self.label_mlp = nn.Embedding(num_embeddings=10,embedding_dim=label_emb_dim)
+        # self.label_mlp = nn.Embedding(num_embeddings=10,embedding_dim=label_emb_dim)
+        self.label_mlp = nn.Sequential(
+            nn.Linear(10,label_emb_dim),
+            nn.GELU(),
+        )
 
         hidden_channels=feature_dims[0]
         feature_dims=feature_dims[1:]
@@ -149,6 +153,14 @@ class UNet(nn.Module):
         # down sample max pooling
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
+    def one_hot(self, label, num_class=10):
+        '''
+        label:[batch_size]
+        '''
+        label_one_hot=torch.zeros((label.shape[0],num_class)).float().to(label.device)
+        label_one_hot.scatter(dim=1, index=label.unsqueeze(1),value=1.0)
+        return label_one_hot
+    
     def forward(self, x, time, label):
         '''
         x:[batch_size,C,W,H],
@@ -159,7 +171,8 @@ class UNet(nn.Module):
         t = self.time_mlp(time)
 
         # label embedding
-        label_emb=self.label_mlp(label)
+        label_one_hot=self.one_hot(label)
+        label_emb=self.label_mlp(label_one_hot)
         
         # init conv
         x=self.init_conv(x)  # 初始卷积层
@@ -309,8 +322,6 @@ def train_ddpm(model, dataloader, optimizer, scheduler, num_epochs, device, save
             # label = batch[1].to(device).to(dtype=torch.float)
             label = batch[1].to(device)
             batch_size = x_0.shape[0]
-            # print(f'label:{label}, label.shape:{label.shape}')
-            # print(f'x_0:{label}, x_0.shape:{x_0.shape}')
             
             # 随机采样时间步
             t = torch.randint(0, model.num_diffusion_timesteps, (batch_size,), device=device).long()
@@ -398,7 +409,7 @@ def main():
     unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
     ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
     
-    num_epochs = 30
+    num_epochs = 50
 
     # 定义优化器
     optimizer = torch.optim.Adam(ddpm.parameters(), lr=1e-4,weight_decay=1e-4)
