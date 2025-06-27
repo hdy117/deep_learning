@@ -47,11 +47,11 @@ class DoubleConv(nn.Module):
         )
         self.double_conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
+            nn.GroupNorm(8,out_channels),
             nn.GELU(),
 
             nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
+            nn.GroupNorm(8,out_channels),
             nn.GELU()
         )
         self.gelu=nn.GELU()
@@ -103,7 +103,7 @@ class UNet(nn.Module):
         # init conv
         self.init_conv=nn.Sequential(
             nn.Conv2d(in_channels, hidden_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(hidden_channels),
+            nn.GroupNorm(8, hidden_channels),
             nn.GELU(),
         )
         
@@ -354,7 +354,7 @@ def main():
     unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
     ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
     
-    num_epochs = 10
+    num_epochs = 50
 
     # 定义优化器
     optimizer = torch.optim.Adam(ddpm.parameters(), lr=2e-4,weight_decay=1e-4)

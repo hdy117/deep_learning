@@ -105,12 +105,12 @@ class UNet(nn.Module):
         )
 
         # label embedding
-        self.label_mlp = nn.Sequential(
-            SinusoidalPositionEmbeddings(label_emb_dim),
-            nn.Linear(label_emb_dim,label_emb_dim),
-            nn.GELU()
-        )
-        # self.label_mlp = nn.Embedding(num_embeddings=10,embedding_dim=label_emb_dim)
+        # self.label_mlp = nn.Sequential(
+        #     SinusoidalPositionEmbeddings(label_emb_dim),
+        #     nn.Linear(label_emb_dim,label_emb_dim),
+        #     nn.GELU()
+        # )
+        self.label_mlp = nn.Embedding(num_embeddings=10,embedding_dim=label_emb_dim)
 
         hidden_channels=feature_dims[0]
         feature_dims=feature_dims[1:]
@@ -398,10 +398,10 @@ def main():
     unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
     ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
     
-    num_epochs = 10
+    num_epochs = 30
 
     # 定义优化器
-    optimizer = torch.optim.Adam(ddpm.parameters(), lr=2e-4,weight_decay=1e-3)
+    optimizer = torch.optim.Adam(ddpm.parameters(), lr=1e-4,weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer=optimizer,T_0=10,eta_min=5e-5)
     
     # 训练模型
