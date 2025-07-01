@@ -226,9 +226,9 @@ class DDPM(nn.Module):
     def p_loss(self, x0, t, label, p_null=0.1):
         noise = torch.randn_like(x0)
         x_t, noise = self.forward_diffusion(x0, t, noise)
-        use_null = (torch.rand(x0.shape[0], device=x0.device) < p_null)
-        label_input = label.clone()
-        label_input[use_null] = -1
+        # use_null = (torch.rand(x0.shape[0], device=x0.device) < p_null)
+        # label_input = label.clone()
+        # label_input[use_null] = -1
         pred_noise = self.unet(x_t, t, label)
         return F.mse_loss(pred_noise, noise)
 
@@ -244,7 +244,7 @@ class DDPM(nn.Module):
                 noise_pred = self.unet(img, t, label)
             else:
                 noise_pred_cond = self.unet(img, t, label)
-                noise_pred_uncond = self.unet(img, t, torch.full_like(label, -1))
+                noise_pred_uncond = self.unet(img, t, None)
                 noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_cond - noise_pred_uncond)
 
             alpha_t = self.alphas[t].view(-1, 1, 1, 1)
@@ -300,12 +300,12 @@ def train_ddpm(model, dataloader, optimizer, scheduler, num_epochs, device, save
             loss.backward()
             optimizer.step()
             
-            # update learning rate
-            scheduler.step()
-            
             epoch_loss += loss.item()
             progress_bar.set_postfix({'loss': loss.item()})
         
+        # update learning rate
+        scheduler.step()
+
         avg_loss = epoch_loss / len(dataloader)
         losses.append(avg_loss)
         print(f"Epoch {epoch+1}/{num_epochs}, Average Loss: {avg_loss:.6f}")
@@ -331,7 +331,7 @@ def generate_samples(model, epoch, device, n_samples=16, save_dir='./samples'):
     
     shape=(16,3,32,32)
     label=torch.randint(0,10,(16,)).to(device)
-    guidance_scale=3.0
+    guidance_scale=1.0
 
     model.eval()
     samples, sample_steps = model.sample(shape,label,guidance_scale)
@@ -382,7 +382,7 @@ def main():
     unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
     ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
     
-    num_epochs = 1
+    num_epochs = 30
 
     # 定义优化器
     optimizer = torch.optim.Adam(ddpm.parameters(), lr=1e-4)
