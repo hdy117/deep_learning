@@ -216,8 +216,8 @@ class DDPM(nn.Module):
         self.num_diffusion_timesteps = num_diffusion_timesteps
         
         # for forward and generate process
-        betas = cosine_beta_schedule(self.num_diffusion_timesteps)
-        # betas = linear_beta_schedule(beta_start, beta_end, self.num_diffusion_timesteps)
+        # betas = cosine_beta_schedule(self.num_diffusion_timesteps)
+        betas = linear_beta_schedule(self.num_diffusion_timesteps, beta_start, beta_end)
         alphas = 1.0 - betas
         alphas_cumprod = torch.cumprod(alphas, 0)
         alphas_cumprod_prev = F.pad(alphas_cumprod[:-1], (1, 0), value=1.0)
@@ -398,7 +398,7 @@ def main():
     unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
     ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
     
-    num_epochs = 30
+    num_epochs = 60
 
     # 定义优化器
     optimizer = torch.optim.Adam(ddpm.parameters(), lr=1e-4)
