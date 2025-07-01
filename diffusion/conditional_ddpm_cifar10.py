@@ -155,7 +155,7 @@ class UNet(nn.Module):
         t = self.time_mlp(time)
 
         # label embedding
-        if label is None:
+        if label is None or (label == -1).all():
             label_emb = torch.zeros(x.shape[0], self.label_embedding_dim, device=x.device)
         else:
             label_emb=self.label_mlp(label)
@@ -229,7 +229,7 @@ class DDPM(nn.Module):
         use_null = (torch.rand(x0.shape[0], device=x0.device) < p_null)
         label_input = label.clone()
         label_input[use_null] = -1
-        pred_noise = self.unet(x_t, t, label)
+        pred_noise = self.unet(x_t, t, label_input)
         return F.mse_loss(pred_noise, noise)
 
     @torch.no_grad()
