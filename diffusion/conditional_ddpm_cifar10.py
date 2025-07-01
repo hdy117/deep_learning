@@ -229,7 +229,7 @@ class DDPM(nn.Module):
         use_null = (torch.rand(x0.shape[0], device=x0.device) < p_null)
         label_input = label.clone()
         label_input[use_null] = -1
-        pred_noise = self.unet(x_t, t, label_input)
+        pred_noise = self.unet(x_t, t, label)
         return F.mse_loss(pred_noise, noise)
 
     @torch.no_grad()
@@ -300,11 +300,11 @@ def train_ddpm(model, dataloader, optimizer, scheduler, num_epochs, device, save
             loss.backward()
             optimizer.step()
             
+            # update learning rate
+            scheduler.step()
+            
             epoch_loss += loss.item()
             progress_bar.set_postfix({'loss': loss.item()})
-        
-        # update learning rate
-        scheduler.step()
         
         avg_loss = epoch_loss / len(dataloader)
         losses.append(avg_loss)
@@ -382,7 +382,7 @@ def main():
     unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
     ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
     
-    num_epochs = 30
+    num_epochs = 1
 
     # 定义优化器
     optimizer = torch.optim.Adam(ddpm.parameters(), lr=1e-4)
