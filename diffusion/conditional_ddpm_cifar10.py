@@ -207,6 +207,7 @@ class DDPM(nn.Module):
         alphas_cumprod_prev = F.pad(alphas_cumprod[:-1], (1, 0), value=1.0)
 
         self.register_buffer("betas", betas)
+        self.register_buffer("alphas", alphas)
         self.register_buffer("alphas_cumprod", alphas_cumprod)
         self.register_buffer("alphas_cumprod_prev", alphas_cumprod_prev)
         self.register_buffer("sqrt_alphas_cumprod", torch.sqrt(alphas_cumprod))
@@ -216,7 +217,7 @@ class DDPM(nn.Module):
     def forward_diffusion(self, x0, t, noise=None):
         """正向扩散过程:直接从x_0计算x_t"""
         if noise is None:
-            nosie=torch.rand_like(x0)
+            noise=torch.rand_like(x0)
         
         sqrt_alpha = self.sqrt_alphas_cumprod[t].view(-1, 1, 1, 1)
         sqrt_one_minus = self.sqrt_one_minus_alphas_cumprod[t].view(-1, 1, 1, 1)
@@ -247,10 +248,11 @@ class DDPM(nn.Module):
                 noise_pred_uncond = self.unet(img, t, None)
                 noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_cond - noise_pred_uncond)
 
-            beta = self.betas[t].view(-1, 1, 1, 1)
+            alpha_t = self.alphas[t].view(-1, 1, 1, 1)
+            beta_t = self.betas[t].view(-1, 1, 1, 1)
             sqrt_one_minus = self.sqrt_one_minus_alphas_cumprod[t].view(-1, 1, 1, 1)
-            sqrt_recip_alpha = (1. / torch.sqrt(1. - beta)).view(-1, 1, 1, 1)
-            mean = sqrt_recip_alpha * (img - beta * noise_pred / sqrt_one_minus)
+
+            mean = (1 / torch.sqrt(alpha_t)) * (img - beta_t * noise_pred / sqrt_one_minus)
 
             if i > 0:
                 noise = torch.randn_like(img)
