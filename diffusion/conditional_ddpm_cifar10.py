@@ -237,8 +237,7 @@ class DDPM(nn.Module):
         device = next(self.parameters()).device
         img = torch.randn(shape, device=device)
         sample_step=100
-        num_sample=self.num_diffusion_timesteps//sample_step
-        sample_steps=torch.randn((num_sample+1,3,32,32)).to(device)
+        sample_steps=[]
         for i in reversed(range(self.num_diffusion_timesteps)):
             t = torch.full((shape[0],), i, device=device, dtype=torch.long)
             if guidance_scale == 1.0 or label is None:
@@ -263,7 +262,7 @@ class DDPM(nn.Module):
             
             # save sample steps results
             if i%sample_step==0:
-                sample_steps[i//sample_step]=img[0]
+                sample_steps.append(img[0].detach().cpu())
         return img,sample_steps
 
 # 训练函数
