@@ -193,6 +193,21 @@ def cosine_beta_schedule(timesteps, s=0.008):
     betas = 1 - (alphas_cumprod[1:] / alphas_cumprod[:-1])
     return torch.clip(betas, 0.0001, 0.9999)
 
+def linear_beta_schedule(timesteps, beta_start=1e-4, beta_end=0.02):
+    """
+    线性 beta schedule,从 beta_start 线性递增到 beta_end。
+    
+    Args:
+        timesteps (int): 扩散步骤数，比如 1000。
+        beta_start (float): beta 起始值。
+        beta_end (float): beta 结束值。
+    
+    Returns:
+        torch.Tensor: 长度为 timesteps 的 beta 序列。
+    """
+    return torch.linspace(beta_start, beta_end, timesteps)
+
+
 # 定义DDPM模型
 class DDPM(nn.Module):
     def __init__(self, model, beta_start=1e-4, beta_end=0.02, num_diffusion_timesteps=1000):
@@ -202,6 +217,7 @@ class DDPM(nn.Module):
         
         # for forward and generate process
         betas = cosine_beta_schedule(self.num_diffusion_timesteps)
+        # betas = linear_beta_schedule(beta_start, beta_end, self.num_diffusion_timesteps)
         alphas = 1.0 - betas
         alphas_cumprod = torch.cumprod(alphas, 0)
         alphas_cumprod_prev = F.pad(alphas_cumprod[:-1], (1, 0), value=1.0)
