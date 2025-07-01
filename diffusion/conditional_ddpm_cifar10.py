@@ -244,7 +244,7 @@ class DDPM(nn.Module):
                 noise_pred = self.unet(img, t, label)
             else:
                 noise_pred_cond = self.unet(img, t, label)
-                noise_pred_uncond = self.unet(img, t, None)
+                noise_pred_uncond = self.unet(img, t, torch.full_like(label, -1))
                 noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_cond - noise_pred_uncond)
 
             alpha_t = self.alphas[t].view(-1, 1, 1, 1)
@@ -299,10 +299,12 @@ def train_ddpm(model, dataloader, optimizer, scheduler, num_epochs, device, save
             # 反向传播
             loss.backward()
             optimizer.step()
-            scheduler.step()
             
             epoch_loss += loss.item()
             progress_bar.set_postfix({'loss': loss.item()})
+        
+        # update learning rate
+        scheduler.step()
         
         avg_loss = epoch_loss / len(dataloader)
         losses.append(avg_loss)
