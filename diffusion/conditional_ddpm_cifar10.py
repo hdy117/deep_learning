@@ -31,7 +31,7 @@ class SinusoidalPositionEmbeddings(nn.Module):
         time:[batch_size]
         '''
         half_dim=self.dim//2 # half dim
-        omega=1.0/(10000.0**(torch.arange(0,half_dim,device=time.device)*1.0/(half_dim-1))) # 1/(10000**i/d) # [half_dim]
+        omega=torch.exp(-1.0*math.log(10000.0)*(torch.arange(0,half_dim,device=time.device)*1.0/(half_dim-1))) # 1/(10000**i/d) # [half_dim]
         embedding=time[:,None]*omega[None,:] # [batch_size, half_dim]
         embedding=torch.concat([embedding.sin(), embedding.cos()],dim=-1) # [batch_size, dim]
 
@@ -41,14 +41,10 @@ class DoubleConv(nn.Module):
     """(Conv => BN => GELU) * 2"""
     def __init__(self, in_channels, out_channels,time_emb_dim,label_emb_dim):
         super().__init__()
-        self.time_mlp = nn.Sequential(
-            nn.Linear(time_emb_dim, in_channels),
-            nn.GELU(),
-        )
-        self.label_mlp = nn.Sequential(
-            nn.Linear(label_emb_dim, in_channels),
-            nn.GELU(),
-        )
+
+        self.time_mlp = nn.Linear(time_emb_dim, in_channels)
+        self.label_mlp = nn.Linear(label_emb_dim, in_channels)
+
         self.double_conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
             nn.GroupNorm(8,out_channels),
@@ -99,20 +95,15 @@ class UNet(nn.Module):
         # 时间嵌入
         self.time_mlp = nn.Sequential(
             SinusoidalPositionEmbeddings(time_emb_dim),
-            nn.Linear(time_emb_dim, time_emb_dim),
-            nn.GELU()
+            nn.Linear(time_emb_dim, 4*time_emb_dim),
+            nn.GELU(),
+            nn.Linear(4*time_emb_dim, time_emb_dim),
         )
-
-        # label embedding
-        # self.label_mlp = nn.Sequential(
-        #     SinusoidalPositionEmbeddings(label_emb_dim),
-        #     nn.Linear(label_emb_dim,label_emb_dim),
-        #     nn.GELU()
-        # )
 
         self.label_mlp = nn.Sequential(
             nn.Embedding(10,label_emb_dim),
             nn.GELU(),
+            nn.Linear(label_emb_dim,label_emb_dim),
         )
 
         hidden_channels=feature_dims[0]
@@ -130,6 +121,8 @@ class UNet(nn.Module):
         
         # up sample blocks
         self.up_sample_blocks=nn.ModuleList()
+
+        self.label_embedding_dim=label_emb_dim
         
         # adding down/up sample blocks
         feature_dim_in=hidden_channels
@@ -145,20 +138,12 @@ class UNet(nn.Module):
         
         # 输出层
         self.out = nn.Sequential(
-            nn.Conv2d(feature_dims[0], out_channels, 1),
+            nn.Conv2d(feature_dims[0], out_channels, kernel_size=3, padding=1),
             # nn.Tanh(),
         )
         
         # down sample max pooling
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-
-    def one_hot(self, label, num_class=10):
-        '''
-        label:[batch_size]
-        '''
-        label_one_hot=torch.zeros((label.shape[0],num_class)).float().to(label.device)
-        label_one_hot.scatter(dim=1, index=label.unsqueeze(1),value=1.0)
-        return label_one_hot
     
     def forward(self, x, time, label):
         '''
@@ -170,7 +155,10 @@ class UNet(nn.Module):
         t = self.time_mlp(time)
 
         # label embedding
-        label_emb=self.label_mlp(label)
+        if label is None:
+            label_emb = torch.zeros(x.shape[0], self.label_embedding_dim, device=x.device)
+        else:
+            label_emb=self.label_mlp(label)
         
         # init conv
         x=self.init_conv(x)  # 初始卷积层
@@ -194,106 +182,87 @@ class UNet(nn.Module):
         # 输出层
         return self.out(x)
 
+# =====================
+# Utility: Cosine beta schedule
+# =====================
+def cosine_beta_schedule(timesteps, s=0.008):
+    steps = timesteps + 1
+    x = torch.linspace(0, timesteps, steps)
+    alphas_cumprod = torch.cos(((x / timesteps) + s) / (1 + s) * math.pi / 2) ** 2
+    alphas_cumprod = alphas_cumprod / alphas_cumprod[0]
+    betas = 1 - (alphas_cumprod[1:] / alphas_cumprod[:-1])
+    return torch.clip(betas, 0.0001, 0.9999)
+
 # 定义DDPM模型
 class DDPM(nn.Module):
     def __init__(self, model, beta_start=1e-4, beta_end=0.02, num_diffusion_timesteps=1000):
         super().__init__()
-        self.model = model
+        self.unet = model
         self.num_diffusion_timesteps = num_diffusion_timesteps
         
-        # 线性调度的噪声系数
-        self.betas = torch.linspace(beta_start, beta_end, num_diffusion_timesteps)
-        self.alphas = 1. - self.betas
-        self.alphas_cumprod = torch.cumprod(self.alphas, dim=0)
-        self.alphas_cumprod_prev = F.pad(self.alphas_cumprod[:-1], (1, 0), value=1.0)
+        # for forward and generate process
+        betas = cosine_beta_schedule(self.num_diffusion_timesteps)
+        alphas = 1.0 - betas
+        alphas_cumprod = torch.cumprod(alphas, 0)
+        alphas_cumprod_prev = F.pad(alphas_cumprod[:-1], (1, 0), value=1.0)
+
+        self.register_buffer("betas", betas)
+        self.register_buffer("alphas_cumprod", alphas_cumprod)
+        self.register_buffer("alphas_cumprod_prev", alphas_cumprod_prev)
+        self.register_buffer("sqrt_alphas_cumprod", torch.sqrt(alphas_cumprod))
+        self.register_buffer("sqrt_one_minus_alphas_cumprod", torch.sqrt(1 - alphas_cumprod))
+        self.register_buffer("posterior_variance", betas * (1 - alphas_cumprod_prev) / (1 - alphas_cumprod))
         
-        # 预计算一些常用值
-        self.sqrt_alphas_cumprod = torch.sqrt(self.alphas_cumprod)
-        self.sqrt_one_minus_alphas_cumprod = torch.sqrt(1. - self.alphas_cumprod)
-        self.posterior_variance = self.betas * (1. - self.alphas_cumprod_prev) / (1. - self.alphas_cumprod)
-        
-    def forward_diffusion(self, x_0, t, noise=None):
+    def forward_diffusion(self, x0, t, noise=None):
         """正向扩散过程:直接从x_0计算x_t"""
         if noise is None:
-            noise = torch.randn_like(x_0)
-            
-        sqrt_alphas_cumprod_t = self._extract(self.sqrt_alphas_cumprod, t, x_0.shape)
-        sqrt_one_minus_alphas_cumprod_t = self._extract(self.sqrt_one_minus_alphas_cumprod, t, x_0.shape)
+            nosie=torch.rand_like(x0)
         
-        # 公式: x_t = sqrt(alphas_cumprod_t) * x_0 + sqrt(1-alphas_cumprod_t) * noise
-        x_t = sqrt_alphas_cumprod_t * x_0 + sqrt_one_minus_alphas_cumprod_t * noise
-        
-        return x_t, noise
-    
-    def p_loss(self, x_0, t, label):
-        """训练损失:预测噪声并计算MSE损失"""
-        noise = torch.randn_like(x_0)
-        x_t, noise = self.forward_diffusion(x_0, t, noise)
-        
-        # 模型预测噪声
-        predicted_noise = self.model(x_t, t, label)
-        
-        # 计算MSE损失
-        loss = F.mse_loss(predicted_noise, noise)
-        
-        return loss
-    
+        sqrt_alpha = self.sqrt_alphas_cumprod[t].view(-1, 1, 1, 1)
+        sqrt_one_minus = self.sqrt_one_minus_alphas_cumprod[t].view(-1, 1, 1, 1)
+        return sqrt_alpha * x0 + sqrt_one_minus * noise, noise
+
+    def p_loss(self, x0, t, label, p_null=0.1):
+        noise = torch.randn_like(x0)
+        x_t, noise = self.forward_diffusion(x0, t, noise)
+        use_null = (torch.rand(x0.shape[0], device=x0.device) < p_null)
+        label_input = label.clone()
+        label_input[use_null] = -1
+        pred_noise = self.unet(x_t, t, label)
+        return F.mse_loss(pred_noise, noise)
+
     @torch.no_grad()
-    def p_sample(self, x_t, t, label):
-        """从x_t采样x_{t-1}（单步去噪）"""
-        betas_t = self._extract(self.betas, t, x_t.shape)
-        sqrt_one_minus_alphas_cumprod_t = self._extract(self.sqrt_one_minus_alphas_cumprod, t, x_t.shape)
-        sqrt_recip_alphas_t = self._extract(torch.sqrt(1.0 / self.alphas), t, x_t.shape)
-        
-        # 预测噪声
-        predicted_noise = self.model(x_t, t, label)
-        
-        # 公式: x_{t-1} = sqrt(1/beta_t) * (x_t - (1-alpha_t)/sqrt(1-alpha_cumprod_t) * predicted_noise) + sqrt(variance) * noise
-        mean = sqrt_recip_alphas_t * (x_t - betas_t * predicted_noise / sqrt_one_minus_alphas_cumprod_t)
-        
-        if t[0] > 0:  # 只有当t>0时才添加噪声
-            noise = torch.randn_like(x_t)
-            posterior_variance_t = self._extract(self.posterior_variance, t, x_t.shape)
-            sample = mean + torch.sqrt(posterior_variance_t) * noise
-        else:  # t=0时直接返回均值
-            sample = mean
-            
-        return sample
-    
-    @torch.no_grad()
-    def p_sample_loop(self, shape, label, device):
-        """完整的去噪过程:从随机噪声开始，逐步生成样本"""
-        batch_size = shape[0]
-        # 从随机噪声开始
+    def sample(self, shape, label=None, guidance_scale=3.0):
+        device = next(self.parameters()).device
         img = torch.randn(shape, device=device)
-        imgs = []
-        
-        for i in tqdm(reversed(range(0, self.num_diffusion_timesteps)), desc='Sampling'):
-            t = torch.full((batch_size,), i, device=device, dtype=torch.long)
-            img = self.p_sample(img, t, label)
-            if (i + 1) % 100 == 0 or i == 0:  # 每100步保存一次中间结果
-                imgs.append(img.cpu().numpy())
+        sample_step=100
+        num_sample=self.num_diffusion_timesteps//sample_step
+        sample_steps=torch.randn((num_sample+1,3,32,32)).to(device)
+        for i in reversed(range(self.num_diffusion_timesteps)):
+            t = torch.full((shape[0],), i, device=device, dtype=torch.long)
+            if guidance_scale == 1.0 or label is None:
+                noise_pred = self.unet(img, t, label)
+            else:
+                noise_pred_cond = self.unet(img, t, label)
+                noise_pred_uncond = self.unet(img, t, None)
+                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_cond - noise_pred_uncond)
+
+            beta = self.betas[t].view(-1, 1, 1, 1)
+            sqrt_one_minus = self.sqrt_one_minus_alphas_cumprod[t].view(-1, 1, 1, 1)
+            sqrt_recip_alpha = (1. / torch.sqrt(1. - beta)).view(-1, 1, 1, 1)
+            mean = sqrt_recip_alpha * (img - beta * noise_pred / sqrt_one_minus)
+
+            if i > 0:
+                noise = torch.randn_like(img)
+                var = self.posterior_variance[t].view(-1, 1, 1, 1)
+                img = mean + torch.sqrt(var) * noise
+            else:
+                img = mean
             
-        return img, imgs
-    
-    @torch.no_grad()
-    def sample(self, image_size, batch_size=16, channels=3, device='cuda'):
-        """生成新样本"""
-        label=torch.randint(0,10,(batch_size,),device=device)
-        # print(f'label.shape:{label.shape}')
-        return self.p_sample_loop((batch_size, channels, image_size, image_size), label, device)
-    
-    def _extract(self, a, t, x_shape):
-        """
-        a: 1D tensor, shape: [T]，例如 alphas、betas、sqrt_alphas_cumprod 等
-        t: 当前 batch 的时间步,shape: [batch_size]
-        x_shape: 目标输出的 shape,例如 [batch_size, C, H, W]
-        
-        返回：从 a 中按 t 提取值并 reshape 成 x_shape 的广播形状 [batch_size, 1, 1, 1]
-        """
-        batch_size = t.shape[0]
-        out = a.gather(-1, t.cpu())
-        return out.reshape(batch_size, *((1,) * (len(x_shape) - 1))).to(t.device)
+            # save sample steps results
+            if i%sample_step==0:
+                sample_steps[i//sample_step]=img[0]
+        return img,sample_steps
 
 # 训练函数
 def train_ddpm(model, dataloader, optimizer, scheduler, num_epochs, device, save_dir='./models'):
@@ -317,7 +286,6 @@ def train_ddpm(model, dataloader, optimizer, scheduler, num_epochs, device, save
             
             # 获取数据
             x_0 = batch[0].to(device)
-            # label = batch[1].to(device).to(dtype=torch.float)
             label = batch[1].to(device)
             batch_size = x_0.shape[0]
             
@@ -358,8 +326,12 @@ def generate_samples(model, epoch, device, n_samples=16, save_dir='./samples'):
     """从DDPM模型生成样本并保存"""
     os.makedirs(save_dir, exist_ok=True)
     
+    shape=(16,3,32,32)
+    label=torch.randint(0,10,(16,)).to(device)
+    guidance_scale=3.0
+
     model.eval()
-    samples, sample_steps = model.sample(image_size=32, batch_size=n_samples, device=device)
+    samples, sample_steps = model.sample(shape,label,guidance_scale)
     
     # save_images(samples, sample_steps, n_samples, epoch, save_dir)
     # def save_images(samples, sample_steps, n_samples=16, epoch=10, save_dir='./samples'):
@@ -380,11 +352,11 @@ def generate_samples(model, epoch, device, n_samples=16, save_dir='./samples'):
     plt.figure(figsize=(15, 5))
     for i, step in enumerate(sample_steps):
         plt.subplot(1, len(sample_steps), i+1)
-        img = step[0].transpose(1, 2, 0)
+        img = step.cpu().numpy().transpose(1, 2, 0)
         img = (img + 1) / 2  # 从[-1,1]范围转换到[0,1]范围
         plt.imshow(np.clip(img, 0, 1))
         plt.axis('off')
-        plt.title(f"Step {step.shape[0] - i - 1}")
+        plt.title(f"Step {i}")
     
     plt.tight_layout()
     plt.savefig(f"{save_dir}/denoising_process_epoch_{epoch}.png")
@@ -405,13 +377,13 @@ def main():
     
     # 初始化模型
     unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
-    ddpm = DDPM(model=unet, num_diffusion_timesteps=2000).to(device)
+    ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
     
     num_epochs = 30
 
     # 定义优化器
-    optimizer = torch.optim.Adam(ddpm.parameters(), lr=1e-4,weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer=optimizer,T_0=10,eta_min=5e-5)
+    optimizer = torch.optim.Adam(ddpm.parameters(), lr=1e-4)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer=optimizer,T_0=10,eta_min=2e-5)
     
     # 训练模型
     losses = train_ddpm(ddpm, train_dataloader, optimizer, scheduler=scheduler, num_epochs=num_epochs, device=device)
