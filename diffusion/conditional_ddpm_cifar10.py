@@ -341,12 +341,12 @@ def train_ddpm(model, dataloader, optimizer, scheduler, num_epochs, device, save
     return losses
 
 # 生成样本函数
-def generate_samples(model, epoch, device, n_samples=16, save_dir='./samples'):
+def generate_samples(model, epoch, device, dataset:torch.utils.data.Dataset, n_samples=16, save_dir='./samples'):
     """从DDPM模型生成样本并保存"""
     os.makedirs(save_dir, exist_ok=True)
     
-    shape=(16,3,32,32)
-    label=torch.randint(0,10,(16,)).to(device)
+    shape=(n_samples,3,32,32)
+    label=torch.randint(0,10,(n_samples,)).to(device)
     guidance_scale=1.0
 
     model.eval()
@@ -355,9 +355,10 @@ def generate_samples(model, epoch, device, n_samples=16, save_dir='./samples'):
     # save_images(samples, sample_steps, n_samples, epoch, save_dir)
     # def save_images(samples, sample_steps, n_samples=16, epoch=10, save_dir='./samples'):
     # 保存最终样本
-    plt.figure(figsize=(10, 10))
+    plt.figure(figsize=(16, 16))
     for i in range(min(16, n_samples)):
         plt.subplot(4, 4, i+1)
+        plt.title(f'{dataset.classes[label[i]]}, label:{label[i]]}')
         img = samples[i].cpu().permute(1, 2, 0).numpy()
         img = (img + 1) / 2  # 从[-1,1]范围转换到[0,1]范围
         plt.imshow(np.clip(img, 0, 1))
@@ -417,7 +418,7 @@ def main():
     plt.close()
     
     # 生成最终样本
-    generate_samples(ddpm, 'final', device, n_samples=64)
+    generate_samples(ddpm, 'final', device, train_dataset, n_samples=64)
 
 if __name__ == "__main__":
     main()
