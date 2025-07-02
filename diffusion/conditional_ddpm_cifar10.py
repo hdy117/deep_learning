@@ -9,10 +9,21 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import math
 import os
+import argparse
 
 # 设置随机种子以确保结果可复现
 # torch.manual_seed(42)
 # np.random.seed(42)
+
+# 数据预处理
+transform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # 将数据标准化到[-1, 1]范围
+])
+
+# 加载CIFAR-10数据集
+train_dataset = torchvision.datasets.CIFAR10(root='../dataset', train=True, download=True, transform=transform)
+train_dataloader = DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=4)
 
 # 检查是否有可用的GPU
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -330,27 +341,35 @@ def train_ddpm(model, dataloader, optimizer, scheduler, num_epochs, device, save
         if (epoch + 1) % 10 == 0:
             torch.save(model.state_dict(), f"{save_dir}/ddpm_epoch.pt")
         
-        # 每10个epoch生成一些样本
-        # with torch.no_grad():
-        #     if (epoch + 1) % 5 == 0:
-        #         samples, sample_steps=model.sample(image_size=32, batch_size=16, device=device)
-        #         save_images(samples, sample_steps, 16, epoch, './samples')
+        # 每5个epoch生成一些样本
+        with torch.no_grad():
+            if (epoch + 1) % 5 == 0:
+                generate_samples(epoch=epoch,device=device,n_samples=16,dataset=train_dataset)
     
     torch.save(model.state_dict(), f"{save_dir}/ddpm_epoch.pt")
     
     return losses
 
 # 生成样本函数
-def generate_samples(model, epoch, device, dataset:torch.utils.data.Dataset, n_samples=16, save_dir='./samples'):
+def generate_samples(epoch, device, dataset:torch.utils.data.Dataset, n_samples=16, save_dir='./samples'):
     """从DDPM模型生成样本并保存"""
     os.makedirs(save_dir, exist_ok=True)
     
-    shape=(n_samples,3,32,32)
-    label=torch.randint(0,10,(n_samples,)).to(device)
+    # 初始化模型
+    unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
+    ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
+
+    if os.path.exists(f"./models/ddpm_epoch.pt"):
+        ddpm.load_state_dict(torch.load(f"./models/ddpm_epoch.pt",map_location=device))
+    else:
+        raise ValueError(f'fail to load ./models/ddpm_epoch.pt')
+
+    shape=(16,3,32,32)
+    label=torch.randint(0,10,(16,)).to(device)
     guidance_scale=1.0
 
-    model.eval()
-    samples, sample_steps = model.sample(shape,label,guidance_scale)
+    ddpm.eval()
+    samples, sample_steps = ddpm.sample(shape,label,guidance_scale)
     
     # save_images(samples, sample_steps, n_samples, epoch, save_dir)
     # def save_images(samples, sample_steps, n_samples=16, epoch=10, save_dir='./samples'):
@@ -384,41 +403,35 @@ def generate_samples(model, epoch, device, dataset:torch.utils.data.Dataset, n_s
 
 
 # 主函数
-def main():
-    # 数据预处理
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # 将数据标准化到[-1, 1]范围
-    ])
-    
-    # 加载CIFAR-10数据集
-    train_dataset = torchvision.datasets.CIFAR10(root='../dataset', train=True, download=True, transform=transform)
-    train_dataloader = DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=4)
-    
-    # 初始化模型
-    unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
-    ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
-    
-    num_epochs = 60
+def main(args):
+    if not args.sample:
+        # 初始化模型
+        unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
+        ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
+        
+        num_epochs = 200
 
-    # 定义优化器
-    optimizer = torch.optim.Adam(ddpm.parameters(), lr=1e-4)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer=optimizer,T_0=10,eta_min=2e-5)
-    
-    # 训练模型
-    losses = train_ddpm(ddpm, train_dataloader, optimizer, scheduler=scheduler, num_epochs=num_epochs, device=device)
-    
-    # 绘制损失曲线
-    plt.figure(figsize=(10, 5))
-    plt.plot(losses)
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.title('Training Loss')
-    plt.savefig('./loss_curve.png')
-    plt.close()
+        # 定义优化器
+        optimizer = torch.optim.Adam(ddpm.parameters(), lr=1e-4)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer=optimizer,T_0=10,eta_min=2e-5)
+        
+        # 训练模型
+        losses = train_ddpm(ddpm, train_dataloader, optimizer, scheduler=scheduler, num_epochs=num_epochs, device=device)
+        
+        # 绘制损失曲线
+        plt.figure(figsize=(10, 5))
+        plt.plot(losses)
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Training Loss')
+        plt.savefig('./loss_curve.png')
+        plt.close()
     
     # 生成最终样本
-    generate_samples(ddpm, 'final', device, train_dataset, n_samples=64)
+    generate_samples(epoch='final', device=device, n_samples=64, dataset=train_dataset)
 
 if __name__ == "__main__":
-    main()
+    arg_parser=argparse.ArgumentParser(description='ddpm console')
+    arg_parser.add_argument('--sample','-s',type=bool,default=False,help='true: sample only, false: train and sample')
+    args=arg_parser.parse_args()
+    main(args)
