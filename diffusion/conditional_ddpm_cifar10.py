@@ -377,7 +377,7 @@ def generate_samples(epoch, device, dataset:torch.utils.data.Dataset, n_samples=
     plt.figure(figsize=(16, 16))
     for i in range(min(16, n_samples)):
         plt.subplot(4, 4, i+1)
-        plt.title(f'{dataset.classes[label[i]]}, label:{label[i]]}')
+        plt.title(f'{dataset.classes[label[i]]}, label:{label[i]}')
         img = samples[i].cpu().permute(1, 2, 0).numpy()
         img = (img + 1) / 2  # 从[-1,1]范围转换到[0,1]范围
         plt.imshow(np.clip(img, 0, 1))
@@ -409,7 +409,7 @@ def main(args):
         unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
         ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
         
-        num_epochs = 200
+        num_epochs = 10
 
         # 定义优化器
         optimizer = torch.optim.Adam(ddpm.parameters(), lr=1e-4)
@@ -428,7 +428,7 @@ def main(args):
         plt.close()
     
     # 生成最终样本
-    generate_samples(epoch='final', device=device, n_samples=64, dataset=train_dataset)
+    generate_samples(epoch='final', device=device, n_samples=16, dataset=train_dataset)
 
 if __name__ == "__main__":
     arg_parser=argparse.ArgumentParser(description='ddpm console')
