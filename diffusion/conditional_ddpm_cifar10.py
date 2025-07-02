@@ -25,6 +25,8 @@ transform = transforms.Compose([
 train_dataset = torchvision.datasets.CIFAR10(root='../dataset', train=True, download=True, transform=transform)
 train_dataloader = DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=4)
 
+num_diffusion_timesteps=2000
+
 # 检查是否有可用的GPU
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"使用设备: {device}")
@@ -221,7 +223,7 @@ def linear_beta_schedule(timesteps, beta_start=1e-4, beta_end=0.02):
 
 # 定义DDPM模型
 class DDPM(nn.Module):
-    def __init__(self, model, beta_start=1e-4, beta_end=0.02, num_diffusion_timesteps=1000):
+    def __init__(self, model, beta_start=1e-4, beta_end=0.02, num_diffusion_timesteps=num_diffusion_timesteps):
         super().__init__()
         self.unet = model
         self.num_diffusion_timesteps = num_diffusion_timesteps
@@ -338,7 +340,7 @@ def train_ddpm(model, dataloader, optimizer, scheduler, num_epochs, device, save
         print(f"Epoch {epoch+1}/{num_epochs}, Average Loss: {avg_loss:.6f}")
         
         # 每个epoch保存模型
-        if (epoch + 1) % 10 == 0:
+        if (epoch + 1) % 5 == 0:
             torch.save(model.state_dict(), f"{save_dir}/ddpm_epoch.pt")
         
         # 每5个epoch生成一些样本
@@ -357,7 +359,7 @@ def generate_samples(epoch, device, dataset:torch.utils.data.Dataset, n_samples=
     
     # 初始化模型
     unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
-    ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
+    ddpm = DDPM(model=unet, num_diffusion_timesteps=num_diffusion_timesteps).to(device)
 
     if os.path.exists(f"./models/ddpm_epoch.pt"):
         ddpm.load_state_dict(torch.load(f"./models/ddpm_epoch.pt",map_location=device))
@@ -407,9 +409,9 @@ def main(args):
     if not args.sample:
         # 初始化模型
         unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
-        ddpm = DDPM(model=unet, num_diffusion_timesteps=1000).to(device)
+        ddpm = DDPM(model=unet, num_diffusion_timesteps=num_diffusion_timesteps).to(device)
         
-        num_epochs = 10
+        num_epochs = 200
 
         # 定义优化器
         optimizer = torch.optim.Adam(ddpm.parameters(), lr=1e-4)
