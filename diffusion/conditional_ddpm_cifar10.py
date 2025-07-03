@@ -28,7 +28,7 @@ train_dataloader = DataLoader(train_dataset, batch_size=128, shuffle=True, num_w
 num_diffusion_timesteps=1000
 
 # 检查是否有可用的GPU
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:3' if torch.cuda.is_available() else 'cpu')
 print(f"使用设备: {device}")
 
 # 定义时间嵌入模块
@@ -368,7 +368,7 @@ def generate_samples(epoch, device, dataset:torch.utils.data.Dataset, n_samples=
 
     shape=(16,3,32,32)
     label=torch.randint(0,10,(16,)).to(device)
-    guidance_scale=1.0
+    guidance_scale=2.0
 
     ddpm.eval()
     samples, sample_steps = ddpm.sample(shape,label,guidance_scale)
@@ -411,7 +411,7 @@ def main(args):
         unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
         ddpm = DDPM(model=unet, num_diffusion_timesteps=num_diffusion_timesteps).to(device)
         
-        num_epochs = 200
+        num_epochs = 10
 
         # 定义优化器
         optimizer = torch.optim.Adam(ddpm.parameters(), lr=1e-4)
