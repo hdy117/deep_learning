@@ -271,11 +271,11 @@ class DDPM(nn.Module):
             t = torch.full((shape[0],), i, device=device, dtype=torch.long)
             
             # predict noise, no condition drop
-            noise_pred = self.unet(img, t, label, cond_drop_ratio=-1e-3)
+            noise_pred = self.unet(img, t, label, cond_drop_ratio=0.0)
             
             # guidance
             if guidance_scale > 1.0:
-                noise_pred_uncond = self.unet(img, t, label, cond_drop_ratio=1.1)  # no label
+                noise_pred_uncond = self.unet(img, t, label, cond_drop_ratio=1.0)  # no label
                 noise_pred = noise_pred_uncond + guidance_scale * (noise_pred - noise_pred_uncond)
 
             alpha_t = self.alphas[t].view(-1, 1, 1, 1)
