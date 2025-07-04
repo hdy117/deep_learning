@@ -28,7 +28,7 @@ train_dataloader = DataLoader(train_dataset, batch_size=128, shuffle=True, num_w
 num_diffusion_timesteps=1000
 
 # 检查是否有可用的GPU
-device = torch.device('cuda:3' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(f"使用设备: {device}")
 
 # 定义时间嵌入模块
@@ -94,7 +94,6 @@ class UPSampleBlock(nn.Module):
         self.feature_dim=feature_dim
     
     def forward(self, x, skip_connection, t, label):
-        # print(f'UPSampleBlock before tran_conv2d: x.shape={x.shape}, skip_connection.shape={skip_connection.shape}, self.feature_dim={self.feature_dim}')
         x=self.tran_conv2d(x)
         x= torch.cat([x, skip_connection], dim=1)  # 拼接跳跃连接
         x=self.double_conv(x, t, label)
@@ -158,7 +157,7 @@ class UNet(nn.Module):
         # down sample max pooling
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
     
-    def forward(self, x, time, label):
+    def forward(self, x:torch.Tensor, time, label, cond_drop_ratio=0.2):
         '''
         x:[batch_size,C,W,H],
         time:[batch_size]
@@ -166,12 +165,13 @@ class UNet(nn.Module):
         '''
         # 时间嵌入
         t = self.time_mlp(time)
-
+        
         # label embedding
-        if label is None or (label == -1).all():
-            label_emb = torch.zeros(x.shape[0], self.label_embedding_dim, device=x.device)
-        else:
-            label_emb=self.label_mlp(label)
+        label_emb=self.label_mlp(label)
+
+        # random drop label embedding
+        keep_mask = (torch.rand((x.shape[0],), device=x.device) >= cond_drop_ratio).float().view(-1,1)  # [batch_size, 1]
+        label_emb = keep_mask*label_emb
         
         # init conv
         x=self.init_conv(x)  # 初始卷积层
@@ -220,7 +220,6 @@ def linear_beta_schedule(timesteps, beta_start=1e-4, beta_end=0.02):
     """
     return torch.linspace(beta_start, beta_end, timesteps)
 
-
 # 定义DDPM模型
 class DDPM(nn.Module):
     def __init__(self, model, beta_start=1e-4, beta_end=0.02, num_diffusion_timesteps=num_diffusion_timesteps):
@@ -252,13 +251,14 @@ class DDPM(nn.Module):
         sqrt_one_minus = self.sqrt_one_minus_alphas_cumprod[t].view(-1, 1, 1, 1)
         return sqrt_alpha * x0 + sqrt_one_minus * noise, noise
 
-    def p_loss(self, x0, t, label, p_null=0.1):
+    def p_loss(self, x0, t, label):
+        # add noise
         noise = torch.randn_like(x0)
         x_t, noise = self.forward_diffusion(x0, t, noise)
-        # use_null = (torch.rand(x0.shape[0], device=x0.device) < p_null)
-        # label_input = label.clone()
-        # label_input[use_null] = -1
-        pred_noise = self.unet(x_t, t, label)
+        
+        # predict noise
+        pred_noise = self.unet(x_t, t, label, cond_drop_ratio=0.2)
+        
         return F.mse_loss(pred_noise, noise)
 
     @torch.no_grad()
@@ -269,12 +269,14 @@ class DDPM(nn.Module):
         sample_steps=[]
         for i in reversed(range(self.num_diffusion_timesteps)):
             t = torch.full((shape[0],), i, device=device, dtype=torch.long)
-            if guidance_scale == 1.0 or label is None:
-                noise_pred = self.unet(img, t, label)
-            else:
-                noise_pred_cond = self.unet(img, t, label)
-                noise_pred_uncond = self.unet(img, t, None)
-                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_cond - noise_pred_uncond)
+            
+            # predict noise, no condition drop
+            noise_pred = self.unet(img, t, label, cond_drop_ratio=-1e-3)
+            
+            # guidance
+            if guidance_scale > 1.0:
+                noise_pred_uncond = self.unet(img, t, label, cond_drop_ratio=1.1)  # no label
+                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred - noise_pred_uncond)
 
             alpha_t = self.alphas[t].view(-1, 1, 1, 1)
             beta_t = self.betas[t].view(-1, 1, 1, 1)
@@ -368,7 +370,7 @@ def generate_samples(epoch, device, dataset:torch.utils.data.Dataset, n_samples=
 
     shape=(16,3,32,32)
     label=torch.randint(0,10,(16,)).to(device)
-    guidance_scale=2.0
+    guidance_scale=3.0
 
     ddpm.eval()
     samples, sample_steps = ddpm.sample(shape,label,guidance_scale)
@@ -411,7 +413,7 @@ def main(args):
         unet = UNet(in_channels=3, out_channels=3, feature_dims=[64,128,256,512]).to(device)
         ddpm = DDPM(model=unet, num_diffusion_timesteps=num_diffusion_timesteps).to(device)
         
-        num_epochs = 10
+        num_epochs = 100
 
         # 定义优化器
         optimizer = torch.optim.Adam(ddpm.parameters(), lr=1e-4)
