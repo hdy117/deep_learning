@@ -304,7 +304,7 @@ class LotDataset(torch.utils.data.Dataset):
         condition=condition[0:self.seq_length]  # condition, [seq_length, out_dim]
         
         # extract x0
-        x0=condition[-1].view(self.out_dim)  # last item in condition, [out_dim]
+        x0=condition[-1]  # last item in condition, [out_dim]
         
         pre_x0=(x0[0:(self.out_dim-1)]-self.pre_scale)/self.pre_scale  # pre x0,
         post_x0=(x0[(self.out_dim-1):]-self.post_scale)/self.post_scale  # post x0,
