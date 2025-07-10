@@ -442,7 +442,7 @@ def sample():
             post_sample=torch.clip(post_sample.to(torch.int),1,int(2*config.post_scale))
             # print(f'{pre_sample}, {post_sample}')
             sample=torch.cat((pre_sample, post_sample), dim=0)  # combine pre and post samples
-            print(f'{sample}')
+            print(f'{sample.tolist()}')
             
 if __name__ == "__main__":
     
