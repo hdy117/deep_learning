@@ -179,7 +179,7 @@ class Diffusion_model(nn.Module):
         
         self.num_cond_feature=num_cond_feature
         self.num_out_dim=num_out_dim
-        self.unet = UNet1D(in_dim=self.num_out_dim, base_dim=32, embedding_dim=128, num_cond_feature=self.num_cond_feature) # 
+        self.unet = UNet1D(in_dim=self.num_out_dim, base_dim=64, embedding_dim=256, num_cond_feature=self.num_cond_feature) # 
 
         self.time_steps = timestep        
         betas = torch.linspace(1e-4, 0.02, timestep)
