@@ -441,10 +441,12 @@ def sample():
             pre_sample=torch.clip(pre_sample.astype(int),1,int(2*config.pre_scale))
             post_sample=torch.clip(post_sample.astype(int),1,int(2*config.post_scale))
             print('{pre_sample}, {post_sample}')
+            # sample=torch.cat((pre_sample, post_sample), dim=0)  # combine pre and post samples
+            # print('{sample}')
             
 if __name__ == "__main__":
     
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(filename)s - %(lineno)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s[%(levelname)s][%(filename)s][%(lineno)s] - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     
     args_parser=argparse.ArgumentParser(description="Train or sample from the Lot DDPM model")
     args_parser.add_argument('--train', action='store_true', help='Train the DDPM model')
