@@ -5,6 +5,7 @@ import math, os, tqdm
 import matplotlib.pyplot as plt
 import pandas as pd
 import argparse
+import logging
 
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=500):
@@ -32,8 +33,6 @@ class ConditionalEncoder(nn.Module):
     def __init__(self, input_dim=7, model_dim = 128, num_layers=1, nhead=8):
         super().__init__()
         self.embedding = nn.Sequential(
-            nn.Embedding(input_dim, model_dim),  # Input dimension to model dimension
-            nn.GELU(),
             nn.Linear(input_dim, model_dim),
         )
         self.encoder = nn.TransformerEncoder(
@@ -108,7 +107,7 @@ class LinearBlock(nn.Module):
         return self.out_activation(x) # (batch_size, out_dim)
     
 class UNet1D(nn.Module):
-    def __init__(self, in_dim=2, base_dim=32, embedding_dim=128, num_cond_feature=4):
+    def __init__(self, in_dim=2, base_dim=32, embedding_dim=128, num_cond_feature=7):
         super().__init__()
         
         # step t embedding, [batch_size] --> [batch_size, t_embed_dim]
@@ -281,7 +280,6 @@ class LotDataset(torch.utils.data.Dataset):
         super().__init__()
         self.data_path = data_path
         self.data=pd.read_csv(self.data_path)  # load data from csv
-        self.item_header=''
         self.seq_length=seq_length
         self.out_dim=out_dim
         self.pre_scale=pre_scale
@@ -296,20 +294,28 @@ class LotDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         condition=torch.zeros((self.seq_length+1, self.out_dim))  # condition input, [seq_length+1, condition_feature_dim]
         for i in range(self.seq_length+1):
-            item = self.data[self.item_header].iloc[idx+i].values
-            item_list=int(item.strip().split(' '))
-            condition[i]=torch.tensor(item_list, dtype=torch.int)
+            item_list=[]
+            for ii in range(self.out_dim-1):
+                item=int(self.data[f'red_ball_{ii}'].iloc[idx+i])  # extract red info from data
+                item_list.append(item)
+            item_list.append(int(self.data[f'blue_ball_0'].iloc[idx+i]))  # extract blue info from data
+            condition[i]=torch.tensor(item_list, dtype=torch.float)
+            
+        # scale condition
+        pre_cond=(condition[:,0:self.out_dim-1]-self.pre_scale)/self.pre_scale
+        post_cond=(condition[:,(self.out_dim-1):]-self.post_scale)/self.post_scale
+        condition_scale=torch.cat((pre_cond, post_cond), dim=1)  # condition, [seq_length+1, out_dim]
         
         # extract condition
-        condition=condition[0:self.seq_length]  # condition, [seq_length, out_dim]
+        condition_scale=condition_scale[0:self.seq_length]  # condition, [seq_length, out_dim]
         
         # extract x0
-        x0=condition[-1]  # last item in condition, [out_dim]
+        x0=condition_scale[-1]  # last item in condition, [out_dim]
         
-        pre_x0=(x0[0:(self.out_dim-1)]-self.pre_scale)/self.pre_scale  # pre x0,
-        post_x0=(x0[(self.out_dim-1):]-self.post_scale)/self.post_scale  # post x0,
-        x0=torch.cat([pre_x0, post_x0], dtype=torch.float32)  # output item, [out_dim]
-        return condition, x0  # ensure the data is in float format  
+        condition_scale = condition_scale.to(torch.float) # ensure condition is in int format
+        x0=x0.to(torch.float)  # ensure x0 is in float format
+                
+        return condition_scale, x0  # ensure the data is in float format  
 
 # config
 class Config:
@@ -350,11 +356,11 @@ def train():
     if os.path.exists(config.model_path):
         ddpm_model.load_state_dict(torch.load(config.model_path))
         ddpm_model.train()
-        print(f'Diffusion model loaded from {config.model_path}')
+        logging.info(f'Diffusion model loaded from {config.model_path}')
     
     for epoch_i in range(config.epochs):
         epoch_loss = 0.0
-        progress_bar = tqdm(config.data_loader, desc=f"Epoch {epoch_i+1}/{config.epochs}")
+        progress_bar = tqdm.tqdm(config.data_loader, desc=f"Epoch {epoch_i+1}/{config.epochs}")
         
         for one_batch in progress_bar:
             # clear gradients
@@ -363,6 +369,8 @@ def train():
             # get condition and x0
             condition=one_batch[0].to(config.device)  # [batch_size, sequence, condition_feature_dim]
             x0=one_batch[1].to(config.device)  # [batch_size, out_dim]
+            
+            logging.debug(f'condition.shape: {condition.shape}, x0.shape: {x0.shape}')
             
             # forward diffusion
             pred_noise, noise = ddpm_model.p_loss(x0, condition)
@@ -382,11 +390,11 @@ def train():
         # save model
         if epoch_i % 10 == 0:
             torch.save(ddpm_model.state_dict(), config.model_path)
-            print(f'Model saved to {config.model_path}')
+            logging.info(f'Model saved to {config.model_path}')
         
         avg_loss = epoch_loss / len(config.data_loader)
         losses.append(avg_loss)
-        print(f"Epoch {epoch_i+1}/{config.epochs}, Average Loss: {avg_loss:.6f}")
+        logging.info(f"Epoch {epoch_i+1}/{config.epochs}, Average Loss: {avg_loss:.6f}")
     
     # 绘制损失曲线
     plt.figure(figsize=(10, 5))
@@ -405,9 +413,9 @@ def sample():
     if os.path.exists(config.model_path):
         ddmp_model.load_state_dict(torch.load(config.model_path))
         ddmp_model.eval()
-        print(f'Diffusion model loaded from {config.model_path}')
+        logging.info(f'Diffusion model loaded from {config.model_path}')
     else:
-        print(f'No model found at {config.model_path}, please train the model first.')
+        logging.info(f'No model found at {config.model_path}, please train the model first.')
         return
 
     with torch.no_grad():
@@ -435,19 +443,22 @@ def sample():
             print('{pre_sample}, {post_sample}')
             
 if __name__ == "__main__":
+    
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(filename)s - %(lineno)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    
     args_parser=argparse.ArgumentParser(description="Train or sample from the Lot DDPM model")
     args_parser.add_argument('--train', action='store_true', help='Train the DDPM model')
     args_parser.add_argument('--sample', action='store_true', help='Sample from the DDPM Model')
     args = args_parser.parse_args()
     
     if args.train:
-        print(f'Training the DDPM model...')
+        logging.info(f'Training the DDPM model...')
         train()
     elif args.sample:  
-        print(f'Sampling from the DDPM model...')     
+        logging.info(f'Sampling from the DDPM model...')     
         sample()
     else:
-        print("Please specify --train or --sample to run the script.")
+        logging.info("Please specify --train or --sample to run the script.")
         args_parser.print_help()
         exit(1)          
     
