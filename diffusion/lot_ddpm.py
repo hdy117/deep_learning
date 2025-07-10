@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as  F
 import math, os, tqdm
 import matplotlib.pyplot as plt
+import pandas as pd
 
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=500):
@@ -275,17 +276,39 @@ class Diffusion_model(nn.Module):
     
 # dataset
 class LotDataset(torch.utils.data.Dataset):
-    def __init__(self, data_path=f'./data/lot_data.csv'):
+    def __init__(self, data_path=f'./data/lot_data.csv', seq_length=72, out_dim=7, pre_scale=16.5, post_scale=8.0):
         super().__init__()
         self.data_path = data_path
-        self.data=None
+        self.data=pd.read_csv(self.data_path)  # load data from csv
+        self.item_header=''
+        self.seq_length=seq_length
+        self.out_dim=out_dim
+        self.pre_scale=pre_scale
+        self.post_scale=post_scale
+        
+        # length of dataset
+        self.dataset_length = len(self.data)-self.seq_length-1
 
     def __len__(self):
-        return len(self.data)
+        return self.dataset_length
 
     def __getitem__(self, idx):
-        item = self.data[idx]
-        return item.float()  # ensure the data is in float format  
+        condition=torch.zeros((self.seq_length+1, self.out_dim))  # condition input, [seq_length+1, condition_feature_dim]
+        for i in range(self.seq_length+1):
+            item = self.data[self.item_header].iloc[idx+i].values
+            item_list=int(item.strip().split(' '))
+            condition[i]=torch.tensor(item_list, dtype=torch.int)
+        
+        # extract condition
+        condition=condition[0:self.seq_length]  # condition, [seq_length, out_dim]
+        
+        # extract x0
+        x0=condition[-1].view(self.out_dim)  # last item in condition, [out_dim]
+        
+        pre_x0=(x0[0:(self.out_dim-1)]-self.pre_scale)/self.pre_scale  # pre x0,
+        post_x0=(x0[(self.out_dim-1):]-self.post_scale)/self.post_scale  # post x0,
+        x0=torch.cat([pre_x0, post_x0], dtype=torch.float32)  # output item, [out_dim]
+        return condition, x0  # ensure the data is in float format  
 
 # config
 class Config:
@@ -293,16 +316,20 @@ class Config:
         self.data_path='./data/lot_data.csv'  # path to the dataset
         self.model_path='./models/lot_ddpm.pth'  # path to save the model
         
-        # dataset and dataloader
-        self.dataset=LotDataset()
-        self.data_loader=torch.utils.data.DataLoader(dataset=self.dataset, batch_size=128, shuffle=True)
-        
         self.device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # device to use
         
+        self.pre_scale=16.5  # pre scale for the first 6 items
+        self.post_scale=8.0  # post scale for the last item
+        
+        self.cond_seq_lenth=72  # condition sequence length
         self.condition_feature_dim=7  # condition input dim
         self.out_dim=7 # output dimension
         self.ddpm_scheduler_steps=1000  # number of diffusion steps
         self.ddpm_model=Diffusion_model(timestep=self.ddpm_scheduler_steps, num_cond_feature=self.condition_feature_dim, num_out_dim=self.out_dim).to(self.device)
+        
+        # dataset and dataloader
+        self.dataset=LotDataset(data_path=self.data_path, seq_length=self.cond_seq_lenth, out_dim=self.out_dim,pre_scale=self.pre_scale, post_scale=self.post_scale)
+        self.data_loader=torch.utils.data.DataLoader(dataset=self.dataset, batch_size=128, shuffle=True)
         
         self.lr=1e-4
         self.epochs=500
@@ -386,7 +413,7 @@ def sample():
         ddmp_model.to(config.device)
         
         # load the last condition from the dataset
-        condition, _=config.dataset[config.dataset.__len__()-1]
+        condition, _=config.dataset[-1]
         condition = condition.to(config.device)
         
         # expand condition to match the sample batch size
@@ -400,10 +427,10 @@ def sample():
         for batch_i in range(samples.shape[0]):
             sample=samples[batch_i]
             sample=sample.view(config.out_dim) # reshape to [out_dim]
-            pre_sample=(sample[0:(config.out_dim-1)]+1.0)*16.5
-            post_sample=(sample[(config.out_dim-1):]+1.0)*8.0
-            pre_sample=torch.clip(pre_sample.astype(int),1,33)
-            post_sample=torch.clip(post_sample.astype(int),1,16)
+            pre_sample=(sample[0:(config.out_dim-1)]+1.0)*config.pre_scale
+            post_sample=(sample[(config.out_dim-1):]+1.0)*config.post_scale
+            pre_sample=torch.clip(pre_sample.astype(int),1,int(2*config.pre_scale))
+            post_sample=torch.clip(post_sample.astype(int),1,int(2*config.post_scale))
             print('{pre_sample}, {post_sample}')
             
             
