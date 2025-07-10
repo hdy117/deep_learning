@@ -4,6 +4,7 @@ import torch.nn.functional as  F
 import math, os, tqdm
 import matplotlib.pyplot as plt
 import pandas as pd
+import argparse
 
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=500):
@@ -433,6 +434,21 @@ def sample():
             post_sample=torch.clip(post_sample.astype(int),1,int(2*config.post_scale))
             print('{pre_sample}, {post_sample}')
             
-            
+if __name__ == "__main__":
+    args_parser=argparse.ArgumentParser(description="Train or sample from the Lot DDPM model")
+    args_parser.add_argument('--train', action='store_true', help='Train the DDPM model')
+    args_parser.add_argument('--sample', action='store_true', help='Sample from the DDPM Model')
+    args = args_parser.parse_args()
+    
+    if args.train:
+        print(f'Training the DDPM model...')
+        train()
+    elif args.sample:  
+        print(f'Sampling from the DDPM model...')     
+        sample()
+    else:
+        print("Please specify --train or --sample to run the script.")
+        args_parser.print_help()
+        exit(1)          
     
 
