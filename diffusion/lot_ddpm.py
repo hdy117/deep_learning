@@ -130,13 +130,15 @@ class UNet1D(nn.Module):
         # down blocks 
         self.down1 = LinearBlock(base_dim, base_dim * 2, embedding_dim=embedding_dim)  #(batch_size, basechannles, l) -> (batch_size, basechannels * 2, l)
         self.down2 = LinearBlock(base_dim * 2, base_dim * 4, embedding_dim=embedding_dim)  # -> (batch_size, basechannels * 4, l)
+        self.down3 = LinearBlock(base_dim * 4, base_dim * 8, embedding_dim=embedding_dim)  # -> (batch_size, basechannels * 4, l)
 
         # bottleneck
-        self.bottleneck = LinearBlock(base_dim * 4, base_dim * 4, embedding_dim=embedding_dim)
+        self.bottleneck = LinearBlock(base_dim * 8, base_dim * 8, embedding_dim=embedding_dim)
         
         # up blocks
-        self.up1 = LinearBlock(base_dim * 8, base_dim * 2, embedding_dim=embedding_dim)
-        self.up2 = LinearBlock(base_dim * 4, base_dim * 1, embedding_dim=embedding_dim)
+        self.up1 = LinearBlock(base_dim * 16, base_dim * 4, embedding_dim=embedding_dim)
+        self.up2 = LinearBlock(base_dim * 8, base_dim * 2, embedding_dim=embedding_dim)
+        self.up3 = LinearBlock(base_dim * 4, base_dim * 1, embedding_dim=embedding_dim)
 
         # output projection
         self.out_proj = nn.Sequential(
@@ -163,13 +165,15 @@ class UNet1D(nn.Module):
         # dowsnsample
         x1 = self.down1(x,embeddings)  # (batch_sizeb, base_dim) -> (batch_size, base_dim*2)
         x2 = self.down2(x1,embeddings)  # (batch_size, base_dim*2) -> (batch_size, base_dim*4)
+        x3 = self.down3(x2,embeddings)  # (batch_size, base_dim*4) -> (batch_size, base_dim*8)
         
         # bottleneck
-        x3 = self.bottleneck(x2,embeddings)  # (batch_size, base_dim*4)
+        x4 = self.bottleneck(x3,embeddings)  # (batch_size, base_dim*4)
 
         # upsample
-        x = self.up1(torch.cat([x3, x2], dim=1),embeddings) # (batch_size, base_dim*8) -> (batch_size, base_dim*2)
-        x = self.up2(torch.cat([x, x1], dim=1),embeddings) # (batch_size, base_dim*4) -> (batch_size, base_dim)
+        x = self.up1(torch.cat([x4, x3], dim=1),embeddings) # (batch_size, base_dim*16) -> (batch_size, base_dim*4)
+        x = self.up2(torch.cat([x, x2], dim=1),embeddings) # (batch_size, base_dim*8) -> (batch_size, base_dim*2)
+        x = self.up3(torch.cat([x, x1], dim=1),embeddings) # (batch_size, base_dim*4) -> (batch_size, base_dim)
 
         return self.out_proj(x)   # (batch_size, base_dim) -> [batch_size,out_dim]
     
@@ -300,6 +304,8 @@ class LotDataset(torch.utils.data.Dataset):
                 item_list.append(item)
             item_list.append(int(self.data[f'blue_ball_0'].iloc[idx+i]))  # extract blue info from data
             condition[i]=torch.tensor(item_list, dtype=torch.float)
+        
+        # logging.info(f'condition:{condition},x0:{condition[self.seq_length:,:].squeeze(0)}')
         
         # scale condition
         pre_cond=(condition[:,0:self.out_dim-1]-self.pre_scale)/self.pre_scale
