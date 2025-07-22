@@ -17,7 +17,7 @@ class PositionalEncoding(nn.Module):
         
         # Compute positional encoding
         position = torch.arange(max_len, dtype=torch.float).unsqueeze(1)  # [max_len, 1]
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(float(max_len)) / d_model))  # [d_model/2]
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))  # [d_model/2]
         
         pe = torch.zeros(max_len, d_model,device=DEVICE)  # [max_len, d_model]
         pe[:, 0::2] = torch.sin(position * div_term)  # Even indices: sine
