@@ -31,7 +31,7 @@ class PositionalEncoding(nn.Module):
         # self.encoding shape: [1, max_len, d_model]
         # Add positional encoding to x (slice to match seq_len)
         seq_len = x.size(1)
-        return x + self.encoding
+        return x + self.encoding[:, :seq_len, :]
 
 class ConditionalEncoder(nn.Module):
     def __init__(self, input_dim=7, model_dim = 128, num_layers=1, nhead=8):
