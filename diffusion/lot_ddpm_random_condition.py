@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as  F
+import torch.distributions as distributions
 import math, os, tqdm
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -290,36 +291,52 @@ class LotDataset(torch.utils.data.Dataset):
         self.post_scale=post_scale
         
         # length of dataset
-        self.dataset_length = len(self.data)-self.seq_length
-
+        self.dataset_length = len(self.data)
+        
+        # uniform distribution for random condition
+        self.uniform_dist_red=distributions.Uniform(low=1,high=33.9)
+        self.uniform_dist_blue=distributions.Uniform(low=1,high=16.9)
+        
     def __len__(self):
         return self.dataset_length
 
     def __getitem__(self, idx):
-        condition=torch.zeros((self.seq_length+1, self.out_dim))  # condition input, [seq_length+1, condition_feature_dim]
-        for i in range(self.seq_length+1):
-            item_list=[]
-            for ii in range(self.out_dim-1):
-                item=int(self.data[f'red_ball_{ii}'].iloc[idx+i])  # extract red info from data
-                item_list.append(item)
-            item_list.append(int(self.data[f'blue_ball_0'].iloc[idx+i]))  # extract blue info from data
-            condition[i]=torch.tensor(item_list, dtype=torch.float)
+        condition=torch.zeros((self.seq_length, self.out_dim))  # condition input, [seq_length, condition_feature_dim]
+        red_cond=self.uniform_dist_red.sample((self.seq_length,self.out_dim-1)) # red balls, [seq_length, out_dim-1]
+        blue_cond=self.uniform_dist_blue.sample((self.seq_length,1)) # blue ball, [seq_length, 1]
         
-        # logging.info(f'condition:{condition},x0:{condition[self.seq_length:,:].squeeze(0)}')
+        condition[:,0:self.out_dim-1]=red_cond  # fill red balls
+        condition[:,(self.out_dim-1):]=blue_cond  # fill blue ball
+        condition=condition.to(torch.int)  # ensure condition is in float format
+        condition=condition.to(torch.float)  # ensure condition is in float format
+        
+        # extract x0 from data
+        item_list=[]
+        for ii in range(self.out_dim-1):
+            item=int(self.data[f'red_ball_{ii}'].iloc[idx])  # extract red info from data
+            item_list.append(item)
+        item_list.append(int(self.data[f'blue_ball_0'].iloc[idx]))  # extract blue info from data
+        x0=torch.tensor(item_list, dtype=torch.float) # [out_dim]
+        
+        # logging.debug(f'condition:{condition},x0:{x0}')
         
         # scale condition
         pre_cond=(condition[:,0:self.out_dim-1]-self.pre_scale)/self.pre_scale
         post_cond=(condition[:,(self.out_dim-1):]-self.post_scale)/self.post_scale
         condition_scale=torch.cat((pre_cond, post_cond), dim=1)  # condition, [seq_length+1, out_dim]
         
-        # extract x0
-        x0=condition_scale[self.seq_length:,:].squeeze(0)  # last item in condition, [out_dim]
-        
+        # scale x0
+        pre_x0=(x0[0:self.out_dim-1]-self.pre_scale)/self.pre_scale
+        post_x0=(x0[(self.out_dim-1):]-self.post_scale)/self.post_scale
+        x0=torch.cat((pre_x0, post_x0), dim=0)  # [out_dim]
+         
         # extract condition
         condition_scale=condition_scale[0:self.seq_length,:]  # condition, [seq_length, out_dim]
         
         condition_scale = condition_scale.to(torch.float) # ensure condition is in int format
         x0=x0.to(torch.float)  # ensure x0 is in float format
+        
+        # logging.debug(f'condition:{condition_scale},x0:{x0}')
                     
         return condition_scale, x0  # ensure the data is in float format  
 
@@ -327,7 +344,7 @@ class LotDataset(torch.utils.data.Dataset):
 class Config:
     def __init__(self):
         self.data_path='./data/lot_data.csv'  # path to the dataset
-        self.model_path='./models/ddpm_lot.pth'  # path to save the model
+        self.model_path='./models/ddpm_lot_random_cond.pth'  # path to save the model
         
         self.device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # device to use
         
@@ -351,6 +368,7 @@ class Config:
         self.lr_scheduler=torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(self.optimizer,T_0=10,T_mult=1,eta_min=1e-5)
         
         self.sample_batch_size=25
+        self.sample_dataloader:torch.utils.data.DataLoader=torch.utils.data.DataLoader(dataset=self.dataset, batch_size=self.sample_batch_size, shuffle=False)  # for sampling
 
 # training loop
 def train():
@@ -376,7 +394,7 @@ def train():
             condition=one_batch[0].to(config.device)  # [batch_size, sequence, condition_feature_dim]
             x0=one_batch[1].to(config.device)  # [batch_size, out_dim]
             
-            logging.debug(f'condition.shape: {condition.shape}, x0.shape: {x0.shape}')
+            # logging.debug(f'condition.shape: {condition.shape}, x0.shape: {x0.shape}')
             
             # forward diffusion
             pred_noise, noise = ddpm_model.p_loss(x0, condition)
@@ -408,7 +426,7 @@ def train():
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.title('Training Loss')
-    plt.savefig('./lot_ddpm_loss_curve.png')
+    plt.savefig('./lot_ddpm_random_cond_loss_curve.png')
     plt.close()
 
 # sample
@@ -428,11 +446,7 @@ def sample():
         ddmp_model.to(config.device)
         
         # load the last condition from the dataset
-        condition, _=config.dataset[config.dataset.__len__()-1]  # get the last condition
-        condition = condition.to(config.device)
-        
-        # expand condition to match the sample batch size
-        condition=condition.expand(config.sample_batch_size, -1, -1) # expand condition to [sample_batch_size, sequence, condition_feature_dim]
+        condition, _=next(iter(config.sample_dataloader)) # [sample_batch_size, sequence, condition_feature_dim]
         
         # sample from the model
         samples=ddmp_model.forward(condition)
@@ -442,12 +456,16 @@ def sample():
         for batch_i in range(samples.shape[0]):
             sample=samples[batch_i]
             sample=sample.view(config.out_dim) # reshape to [out_dim]
+            
             pre_sample=(sample[0:(config.out_dim-1)]+1.0)*config.pre_scale
             post_sample=(sample[(config.out_dim-1):]+1.0)*config.post_scale
+            
             pre_sample=torch.clip(pre_sample.to(torch.int),1,int(2*config.pre_scale))
             post_sample=torch.clip(post_sample.to(torch.int),1,int(2*config.post_scale))
-            # print(f'{pre_sample}, {post_sample}')
+            
             sample=torch.cat((pre_sample, post_sample), dim=0)  # combine pre and post samples
+            sample:list=sample.tolist()  # convert to list
+            
             sample_set=set(sample)  # convert to set to remove duplicates
             if len(sample_set) == config.out_dim:  # if there are no duplicates, we accept the sample
                 print(f'{sample.sample()}')
