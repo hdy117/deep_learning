@@ -447,6 +447,7 @@ def sample():
         
         # load the last condition from the dataset
         condition, _=next(iter(config.sample_dataloader)) # [sample_batch_size, sequence, condition_feature_dim]
+        condition=condition.to(config.device)  # move to device
         
         # sample from the model
         samples=ddmp_model.forward(condition)
@@ -468,7 +469,7 @@ def sample():
             
             sample_set=set(sample)  # convert to set to remove duplicates
             if len(sample_set) == config.out_dim:  # if there are no duplicates, we accept the sample
-                print(f'{sample.sample()}')
+                print(f'{sample}')
             
 if __name__ == "__main__":
     

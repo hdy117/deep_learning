@@ -450,7 +450,7 @@ def sample():
             sample=torch.cat((pre_sample, post_sample), dim=0)  # combine pre and post samples
             sample_set=set(sample)  # convert to set to remove duplicates
             if len(sample_set) == config.out_dim:  # if there are no duplicates, we accept the sample
-                print(f'{sample.sample()}')
+                print(f'{sample}')
             
 if __name__ == "__main__":
     
