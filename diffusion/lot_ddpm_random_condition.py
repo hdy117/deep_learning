@@ -8,15 +8,18 @@ import pandas as pd
 import argparse
 import logging
 
+SEQ_LENGTH=int(2e3)
+DEVICE=torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # device to use
+
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, max_len=500):
+    def __init__(self, d_model, max_len=SEQ_LENGTH+1):
         super(PositionalEncoding, self).__init__()
         
         # Compute positional encoding
         position = torch.arange(max_len, dtype=torch.float).unsqueeze(1)  # [max_len, 1]
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))  # [d_model/2]
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(float(max_len)) / d_model))  # [d_model/2]
         
-        pe = torch.zeros(max_len, d_model)  # [max_len, d_model]
+        pe = torch.zeros(max_len, d_model,device=DEVICE)  # [max_len, d_model]
         pe[:, 0::2] = torch.sin(position * div_term)  # Even indices: sine
         pe[:, 1::2] = torch.cos(position * div_term)  # Odd indices: cosine
         
@@ -28,7 +31,7 @@ class PositionalEncoding(nn.Module):
         # self.encoding shape: [1, max_len, d_model]
         # Add positional encoding to x (slice to match seq_len)
         seq_len = x.size(1)
-        return x + self.encoding[:, :seq_len, :].to(x.device)
+        return x + self.encoding
 
 class ConditionalEncoder(nn.Module):
     def __init__(self, input_dim=7, model_dim = 128, num_layers=1, nhead=8):
@@ -40,7 +43,7 @@ class ConditionalEncoder(nn.Module):
             nn.TransformerEncoderLayer(d_model=model_dim, nhead=nhead, batch_first=True,dim_feedforward=model_dim*4, activation='gelu'), 
             num_layers=num_layers
         )
-        self.positonal_encoding=PositionalEncoding(model_dim, max_len=model_dim+1)  # Positional encoding for transformer
+        self.positonal_encoding=PositionalEncoding(model_dim)  # Positional encoding for transformer
         self.class_token=nn.Parameter(torch.randn(1,1,model_dim)) # Class token for transformer
 
     def forward(self, x):
@@ -346,12 +349,12 @@ class Config:
         self.data_path='./data/lot_data.csv'  # path to the dataset
         self.model_path='./models/ddpm_lot_random_cond.pth'  # path to save the model
         
-        self.device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # device to use
+        self.device=DEVICE  # device to use
         
         self.pre_scale=16.5  # pre scale for the first 6 items
         self.post_scale=8.0  # post scale for the last item
         
-        self.cond_seq_lenth=72  # condition sequence length
+        self.cond_seq_lenth=SEQ_LENGTH  # condition sequence length
         self.condition_feature_dim=7  # condition input dim
         self.out_dim=7 # output dimension
         self.ddpm_scheduler_steps=1000  # number of diffusion steps
