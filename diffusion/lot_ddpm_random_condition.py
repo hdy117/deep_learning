@@ -8,7 +8,7 @@ import pandas as pd
 import argparse
 import logging
 
-SEQ_LENGTH=int(2e3)
+SEQ_LENGTH=int(1e2)
 DEVICE=torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # device to use
 
 class PositionalEncoding(nn.Module):
@@ -304,13 +304,19 @@ class LotDataset(torch.utils.data.Dataset):
         return self.dataset_length
 
     def __getitem__(self, idx):
+        uniform_cond=False
         condition=torch.zeros((self.seq_length, self.out_dim))  # condition input, [seq_length, condition_feature_dim]
-        red_cond=self.uniform_dist_red.sample((self.seq_length,self.out_dim-1)) # red balls, [seq_length, out_dim-1]
-        blue_cond=self.uniform_dist_blue.sample((self.seq_length,1)) # blue ball, [seq_length, 1]
+        if uniform_cond:
+            red_cond=self.uniform_dist_red.sample((self.seq_length,self.out_dim-1)) # red balls, [seq_length, out_dim-1]
+            blue_cond=self.uniform_dist_blue.sample((self.seq_length,1)) # blue ball, [seq_length, 1]
+        else:
+            red_cond=torch.randn((self.seq_length,self.out_dim-1)) # red balls, [seq_length, out_dim-1]
+            blue_cond=torch.randn((self.seq_length,1)) # blue ball, [seq_length, 1]
         
         condition[:,0:self.out_dim-1]=red_cond  # fill red balls
         condition[:,(self.out_dim-1):]=blue_cond  # fill blue ball
-        condition=condition.to(torch.int)  # ensure condition is in float format
+
+        condition=torch.clip(condition,-1.0,1.0)  # ensure condition is in float format
         condition=condition.to(torch.float)  # ensure condition is in float format
         
         # extract x0 from data
@@ -321,25 +327,26 @@ class LotDataset(torch.utils.data.Dataset):
         item_list.append(int(self.data[f'blue_ball_0'].iloc[idx]))  # extract blue info from data
         x0=torch.tensor(item_list, dtype=torch.float) # [out_dim]
         
-        # logging.debug(f'condition:{condition},x0:{x0}')
+        # logging.info(f'condition:{condition},x0:{x0}')
         
         # scale condition
-        pre_cond=(condition[:,0:self.out_dim-1]-self.pre_scale)/self.pre_scale
-        post_cond=(condition[:,(self.out_dim-1):]-self.post_scale)/self.post_scale
-        condition_scale=torch.cat((pre_cond, post_cond), dim=1)  # condition, [seq_length+1, out_dim]
+        if uniform_cond:
+            pre_cond=(condition[:,0:self.out_dim-1]-self.pre_scale)/self.pre_scale
+            post_cond=(condition[:,(self.out_dim-1):]-self.post_scale)/self.post_scale
+            condition_scale=torch.cat((pre_cond, post_cond), dim=1)  # condition, [seq_length+1, out_dim]
+        else:
+            condition_scale=condition
         
         # scale x0
         pre_x0=(x0[0:self.out_dim-1]-self.pre_scale)/self.pre_scale
         post_x0=(x0[(self.out_dim-1):]-self.post_scale)/self.post_scale
         x0=torch.cat((pre_x0, post_x0), dim=0)  # [out_dim]
+        x0=torch.clip(x0,-1.0,1.0)
          
         # extract condition
-        condition_scale=condition_scale[0:self.seq_length,:]  # condition, [seq_length, out_dim]
-        
         condition_scale = condition_scale.to(torch.float) # ensure condition is in int format
-        x0=x0.to(torch.float)  # ensure x0 is in float format
         
-        # logging.debug(f'condition:{condition_scale},x0:{x0}')
+        # logging.info(f'condition:{condition_scale},x0:{x0}')
                     
         return condition_scale, x0  # ensure the data is in float format  
 
@@ -362,7 +369,7 @@ class Config:
         
         # dataset and dataloader
         self.dataset=LotDataset(data_path=self.data_path, seq_length=self.cond_seq_lenth, out_dim=self.out_dim,pre_scale=self.pre_scale, post_scale=self.post_scale)
-        self.data_loader=torch.utils.data.DataLoader(dataset=self.dataset, batch_size=128, shuffle=True)
+        self.data_loader=torch.utils.data.DataLoader(dataset=self.dataset, batch_size=1024, shuffle=True)
         
         self.lr=1e-4
         self.epochs=1000
@@ -445,12 +452,22 @@ def sample():
         logging.info(f'No model found at {config.model_path}, please train the model first.')
         return
 
-    with torch.no_grad():
+    with torch.no_grad():  
         ddmp_model.to(config.device)
         
-        # load the last condition from the dataset
-        condition, _=next(iter(config.sample_dataloader)) # [sample_batch_size, sequence, condition_feature_dim]
-        condition=condition.to(config.device)  # move to device
+        sample_last_cond=True
+        
+        if sample_last_cond:
+            # load the last condition from the dataset
+            condition, _=config.dataset[config.dataset.__len__()-1]  # get the last condition
+            condition = condition.to(config.device)
+            
+            # expand condition to match the sample batch size
+            condition=condition.expand(config.sample_batch_size, -1, -1) # expand condition to [sample_batch_size, sequence, condition_feature_dim]
+        else:
+            # load the last condition from the dataset
+            condition, _=next(iter(config.sample_dataloader)) # [sample_batch_size, sequence, condition_feature_dim]
+            condition=condition.to(config.device)  # move to device
         
         # sample from the model
         samples=ddmp_model.forward(condition)
