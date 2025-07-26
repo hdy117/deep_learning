@@ -8,7 +8,7 @@ import pandas as pd
 import argparse
 import logging
 
-SEQ_LENGTH=int(1e2)
+SEQ_LENGTH=int(2e2)
 DEVICE=torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # device to use
 
 class PositionalEncoding(nn.Module):
@@ -310,14 +310,13 @@ class LotDataset(torch.utils.data.Dataset):
             red_cond=self.uniform_dist_red.sample((self.seq_length,self.out_dim-1)) # red balls, [seq_length, out_dim-1]
             blue_cond=self.uniform_dist_blue.sample((self.seq_length,1)) # blue ball, [seq_length, 1]
         else:
-            red_cond=torch.randn((self.seq_length,self.out_dim-1)) # red balls, [seq_length, out_dim-1]
-            blue_cond=torch.randn((self.seq_length,1)) # blue ball, [seq_length, 1]
+            # red_cond=torch.randn((self.seq_length,self.out_dim-1)) # red balls, [seq_length, out_dim-1]
+            # blue_cond=torch.randn((self.seq_length,1)) # blue ball, [seq_length, 1]
+            red_cond=torch.randint(low=1,high=34,size=(self.seq_length,self.out_dim-1)) # red balls, [seq_length, out_dim-1]
+            blue_cond=torch.randint(low=1,high=17,size=(self.seq_length,1)) # blue ball, [seq_length, 1]
         
         condition[:,0:self.out_dim-1]=red_cond  # fill red balls
         condition[:,(self.out_dim-1):]=blue_cond  # fill blue ball
-
-        condition=torch.clip(condition,-1.0,1.0)  # ensure condition is in float format
-        condition=condition.to(torch.float)  # ensure condition is in float format
         
         # extract x0 from data
         item_list=[]
@@ -330,12 +329,10 @@ class LotDataset(torch.utils.data.Dataset):
         # logging.info(f'condition:{condition},x0:{x0}')
         
         # scale condition
-        if uniform_cond:
-            pre_cond=(condition[:,0:self.out_dim-1]-self.pre_scale)/self.pre_scale
-            post_cond=(condition[:,(self.out_dim-1):]-self.post_scale)/self.post_scale
-            condition_scale=torch.cat((pre_cond, post_cond), dim=1)  # condition, [seq_length+1, out_dim]
-        else:
-            condition_scale=condition
+        pre_cond=(condition[:,0:self.out_dim-1]-self.pre_scale)/self.pre_scale
+        post_cond=(condition[:,(self.out_dim-1):]-self.post_scale)/self.post_scale
+        condition_scale=torch.cat((pre_cond, post_cond), dim=1).to(float)  # condition, [seq_length+1, out_dim]
+        condition=torch.clip(condition,-1.0,1.0)  # ensure condition is in float format
         
         # scale x0
         pre_x0=(x0[0:self.out_dim-1]-self.pre_scale)/self.pre_scale
@@ -343,9 +340,6 @@ class LotDataset(torch.utils.data.Dataset):
         x0=torch.cat((pre_x0, post_x0), dim=0)  # [out_dim]
         x0=torch.clip(x0,-1.0,1.0)
          
-        # extract condition
-        condition_scale = condition_scale.to(torch.float) # ensure condition is in int format
-        
         # logging.info(f'condition:{condition_scale},x0:{x0}')
                     
         return condition_scale, x0  # ensure the data is in float format  
