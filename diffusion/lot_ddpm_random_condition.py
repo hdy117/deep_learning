@@ -8,7 +8,7 @@ import pandas as pd
 import argparse
 import logging
 
-SEQ_LENGTH=int(2e2)
+SEQ_LENGTH=int(1e2)
 DEVICE=torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # device to use
 
 class PositionalEncoding(nn.Module):
