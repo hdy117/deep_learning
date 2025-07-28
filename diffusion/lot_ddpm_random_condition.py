@@ -331,17 +331,15 @@ class LotDataset(torch.utils.data.Dataset):
         # scale condition
         pre_cond=(condition[:,0:self.out_dim-1]-self.pre_scale)/self.pre_scale
         post_cond=(condition[:,(self.out_dim-1):]-self.post_scale)/self.post_scale
-        condition_scale=torch.cat((pre_cond, post_cond), dim=1).to(float)  # condition, [seq_length+1, out_dim]
-        condition=torch.clip(condition,-1.0,1.0)  # ensure condition is in float format
+        condition_scale=torch.cat((pre_cond, post_cond), dim=1)  # condition, [seq_length+1, out_dim]
+        condition_scale=torch.clip(condition_scale,-1.0,1.0).to(torch.float)  # ensure condition is in float format
         
         # scale x0
         pre_x0=(x0[0:self.out_dim-1]-self.pre_scale)/self.pre_scale
         post_x0=(x0[(self.out_dim-1):]-self.post_scale)/self.post_scale
         x0=torch.cat((pre_x0, post_x0), dim=0)  # [out_dim]
-        x0=torch.clip(x0,-1.0,1.0)
-         
-        # logging.info(f'condition:{condition_scale},x0:{x0}')
-                    
+        x0=torch.clip(x0,-1.0,1.0).to(torch.float)
+                            
         return condition_scale, x0  # ensure the data is in float format  
 
 # config
@@ -371,7 +369,7 @@ class Config:
         self.criterion=nn.MSELoss()
         self.lr_scheduler=torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(self.optimizer,T_0=10,T_mult=1,eta_min=1e-5)
         
-        self.sample_batch_size=25
+        self.sample_batch_size=50
         self.sample_dataloader:torch.utils.data.DataLoader=torch.utils.data.DataLoader(dataset=self.dataset, batch_size=self.sample_batch_size, shuffle=False)  # for sampling
 
 # training loop
