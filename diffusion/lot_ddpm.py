@@ -357,6 +357,7 @@ def train():
     config:Config = Config()
     ddpm_model:Diffusion_model=config.ddpm_model
     losses = []
+    best_loss = 1e9
     
     # load if model exists
     if os.path.exists(config.model_path):
@@ -394,13 +395,19 @@ def train():
         config.lr_scheduler.step()
         
         # save model
-        if epoch_i % 10 == 0:
-            torch.save(ddpm_model.state_dict(), config.model_path)
-            logging.info(f'Model saved to {config.model_path}')
+        # if epoch_i % 10 == 0:
+        #     torch.save(ddpm_model.state_dict(), config.model_path)
+        #     logging.info(f'Model saved to {config.model_path}')
         
         avg_loss = epoch_loss / len(config.data_loader)
         losses.append(avg_loss)
         logging.info(f"Epoch {epoch_i+1}/{config.epochs}, Average Loss: {avg_loss:.6f}")
+
+        # save the best model
+        if avg_loss < best_loss and epoch_i > config.epochs * 0.8:
+            best_loss = avg_loss
+            torch.save(ddpm_model.state_dict(), config.model_path)
+            logging.info(f'Best model saved to {config.model_path} with loss {best_loss:.6f}')
     
     # 绘制损失曲线
     plt.figure(figsize=(10, 5))
