@@ -305,7 +305,7 @@ class LotDataset(torch.utils.data.Dataset):
             item_list.append(int(self.data[f'blue_ball_0'].iloc[idx+i]))  # extract blue info from data
             condition[i]=torch.tensor(item_list, dtype=torch.float)
         
-        # logging.info(f'condition:{condition},x0:{condition[self.seq_length:,:].squeeze(0)}')
+        # logging.info(f'condition:{condition[:self.seq_length,:]},x0:{condition[self.seq_length:,:].squeeze(0)}')
         
         # scale condition
         pre_cond=(condition[:,0:self.out_dim-1]-self.pre_scale)/self.pre_scale
@@ -320,6 +320,8 @@ class LotDataset(torch.utils.data.Dataset):
         
         condition_scale = condition_scale.to(torch.float) # ensure condition is in int format
         x0=x0.to(torch.float)  # ensure x0 is in float format
+
+        # logging.info(f'condition_scale: {condition_scale}, x0: {x0}')
                     
         return condition_scale, x0  # ensure the data is in float format  
 
@@ -449,12 +451,16 @@ def sample():
         for batch_i in range(samples.shape[0]):
             sample=samples[batch_i]
             sample=sample.view(config.out_dim) # reshape to [out_dim]
+
             pre_sample=(sample[0:(config.out_dim-1)]+1.0)*config.pre_scale
             post_sample=(sample[(config.out_dim-1):]+1.0)*config.post_scale
+
             pre_sample=torch.clip(pre_sample.to(torch.int),1,int(2*config.pre_scale))
             post_sample=torch.clip(post_sample.to(torch.int),1,int(2*config.post_scale))
-            # print(f'{pre_sample}, {post_sample}')
+            
             sample=torch.cat((pre_sample, post_sample), dim=0)  # combine pre and post samples
+            # logging.info(f'sample.shape:{sample.shape}')
+            sample=sample.tolist()
             sample_set=set(sample)  # convert to set to remove duplicates
             if len(sample_set) == config.out_dim:  # if there are no duplicates, we accept the sample
                 print(f'{sample}')
