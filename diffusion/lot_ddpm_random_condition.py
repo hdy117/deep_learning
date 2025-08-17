@@ -364,7 +364,7 @@ class Config:
         self.data_loader=torch.utils.data.DataLoader(dataset=self.dataset, batch_size=1024, shuffle=True)
         
         self.lr=1e-4
-        self.epochs=10000
+        self.epochs=15000
         self.optimizer=torch.optim.Adam(self.ddpm_model.parameters(), lr=self.lr, weight_decay=1e-5)
         self.criterion=nn.MSELoss()
         self.lr_scheduler=torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(self.optimizer,T_0=10,T_mult=1,eta_min=1e-5)
@@ -426,7 +426,7 @@ def train():
         logging.info(f"Epoch {epoch_i+1}/{config.epochs}, Average Loss: {avg_loss:.6f}")
 
         # save the best model
-        if avg_loss < best_loss and epoch_i > config.epochs * 0.8:
+        if avg_loss < best_loss and epoch_i > config.epochs * 0.95:
             best_loss = avg_loss
             torch.save(ddpm_model.state_dict(), config.model_path)
             logging.info(f'Best model saved to {config.model_path} with loss {best_loss:.6f}')
