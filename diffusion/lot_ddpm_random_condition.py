@@ -8,7 +8,7 @@ import pandas as pd
 import argparse
 import logging
 
-SEQ_LENGTH=int(1e2)
+SEQ_LENGTH=int(3e2)
 DEVICE=torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # device to use
 
 class PositionalEncoding(nn.Module):
@@ -364,13 +364,15 @@ class Config:
         self.data_loader=torch.utils.data.DataLoader(dataset=self.dataset, batch_size=1024, shuffle=True)
         
         self.lr=1e-4
-        self.epochs=1000
+        self.epochs=10000
         self.optimizer=torch.optim.Adam(self.ddpm_model.parameters(), lr=self.lr, weight_decay=1e-5)
         self.criterion=nn.MSELoss()
         self.lr_scheduler=torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(self.optimizer,T_0=10,T_mult=1,eta_min=1e-5)
         
-        self.sample_batch_size=50
+        self.sample_batch_size=10
         self.sample_dataloader:torch.utils.data.DataLoader=torch.utils.data.DataLoader(dataset=self.dataset, batch_size=self.sample_batch_size, shuffle=False)  # for sampling
+        
+        self.out_file='./lot_ddpm_random_condition.txt'
 
 # training loop
 def train():
@@ -415,19 +417,19 @@ def train():
         config.lr_scheduler.step()
         
         # save model
-        if (epoch_i+1) % 10 == 0:
-            torch.save(ddpm_model.state_dict(), config.model_path)
-            logging.info(f'Model saved to {config.model_path}')
+        # if (epoch_i+1) % 10 == 0:
+        #     torch.save(ddpm_model.state_dict(), config.model_path)
+        #     logging.info(f'Model saved to {config.model_path}')
         
         avg_loss = epoch_loss / len(config.data_loader)
         losses.append(avg_loss)
         logging.info(f"Epoch {epoch_i+1}/{config.epochs}, Average Loss: {avg_loss:.6f}")
 
         # save the best model
-        # if avg_loss < best_loss and epoch_i > config.epochs * 0.8:
-        #     best_loss = avg_loss
-        #     torch.save(ddpm_model.state_dict(), config.model_path)
-        #     logging.info(f'Best model saved to {config.model_path} with loss {best_loss:.6f}')
+        if avg_loss < best_loss and epoch_i > config.epochs * 0.8:
+            best_loss = avg_loss
+            torch.save(ddpm_model.state_dict(), config.model_path)
+            logging.info(f'Best model saved to {config.model_path} with loss {best_loss:.6f}')
     
     # 绘制损失曲线
     plt.figure(figsize=(10, 5))
@@ -437,6 +439,27 @@ def train():
     plt.title('Training Loss')
     plt.savefig('./lot_ddpm_random_cond_loss_curve.png')
     plt.close()
+
+
+def append_list_to_file(file_path, items_list):
+    """
+    Append a list to a file (creates file if it doesn't exist).
+    
+    Args:
+        file_path (str): Path to the file
+        items_list (list): List of items to append
+    """
+    try:
+        # 'a' mode creates file if it doesn't exist
+        with open(file_path, 'a') as file:
+            # Check if file was empty before appending
+            # (tell() returns current position - 0 means new/empty file)
+            
+            # Write each item in the list
+            file.write(f"{items_list}\n")
+            
+    except IOError as e:
+        print(f"An error occurred: {e}")
 
 # sample
 def sample():
@@ -454,7 +477,7 @@ def sample():
     with torch.no_grad():  
         ddmp_model.to(config.device)
         
-        sample_last_cond=True
+        sample_last_cond=False
         
         if sample_last_cond:
             # load the last condition from the dataset
@@ -489,6 +512,7 @@ def sample():
             sample_set=set(sample)  # convert to set to remove duplicates
             if len(sample_set) == config.out_dim:  # if there are no duplicates, we accept the sample
                 print(f'{sample}')
+                append_list_to_file(config.out_file, sample)
             
 if __name__ == "__main__":
     

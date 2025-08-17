@@ -353,6 +353,7 @@ class Config:
         self.lr_scheduler=torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(self.optimizer,T_0=10,T_mult=1,eta_min=1e-5)
         
         self.sample_batch_size=10
+        self.out_file='./lot_ddpm.txt'
 
 # training loop
 def train():
@@ -420,6 +421,26 @@ def train():
     plt.savefig('./lot_ddpm_loss_curve.png')
     plt.close()
 
+def append_list_to_file(file_path, items_list):
+    """
+    Append a list to a file (creates file if it doesn't exist).
+    
+    Args:
+        file_path (str): Path to the file
+        items_list (list): List of items to append
+    """
+    try:
+        # 'a' mode creates file if it doesn't exist
+        with open(file_path, 'a') as file:
+            # Check if file was empty before appending
+            # (tell() returns current position - 0 means new/empty file)
+            
+            # Write each item in the list
+            file.write(f"{items_list}\n")
+            
+    except IOError as e:
+        print(f"An error occurred: {e}")
+
 # sample
 def sample():
     config:Config = Config()
@@ -437,8 +458,15 @@ def sample():
         ddmp_model.to(config.device)
         
         # load the last condition from the dataset
-        condition, _=config.dataset[config.dataset.__len__()-1]  # get the last condition
+        condition, x0=config.dataset[config.dataset.__len__()-1]  # get the last condition
+        condition=torch.cat([condition[1::,:],x0.unsqueeze(0)],dim=0)
         condition = condition.to(config.device)
+        # cond_test_pre=(condition[:,0:(config.out_dim-1)]+1.0)*config.pre_scale
+        # cond_test_post=(condition[:,(config.out_dim-1):]+1.0)*config.post_scale
+        # print(f'cond_test_pre:{cond_test_pre.shape},cond_test_post:{cond_test_post.shape}')
+        # cond_test=torch.cat([cond_test_pre,cond_test_post],dim=1)
+        # print(f'condition:{condition}, x0:{x0}')
+        # print(f'cond_test:{cond_test}')
         
         # expand condition to match the sample batch size
         condition=condition.expand(config.sample_batch_size, -1, -1) # expand condition to [sample_batch_size, sequence, condition_feature_dim]
@@ -464,6 +492,8 @@ def sample():
             sample_set=set(sample)  # convert to set to remove duplicates
             if len(sample_set) == config.out_dim:  # if there are no duplicates, we accept the sample
                 print(f'{sample}')
+                append_list_to_file(config.out_file,sample)
+                
             
 if __name__ == "__main__":
     
