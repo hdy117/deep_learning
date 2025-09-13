@@ -8,7 +8,7 @@ import pandas as pd
 import argparse
 import logging
 
-SEQ_LENGTH=int(4e2)
+SEQ_LENGTH=int(100)
 DEVICE=torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # device to use
 
 class PositionalEncoding(nn.Module):
@@ -310,10 +310,10 @@ class LotDataset(torch.utils.data.Dataset):
             red_cond=self.uniform_dist_red.sample((self.seq_length,self.out_dim-1)) # red balls, [seq_length, out_dim-1]
             blue_cond=self.uniform_dist_blue.sample((self.seq_length,1)) # blue ball, [seq_length, 1]
         else:
-            # red_cond=torch.randn((self.seq_length,self.out_dim-1)) # red balls, [seq_length, out_dim-1]
-            # blue_cond=torch.randn((self.seq_length,1)) # blue ball, [seq_length, 1]
-            red_cond=torch.randint(low=1,high=34,size=(self.seq_length,self.out_dim-1)) # red balls, [seq_length, out_dim-1]
-            blue_cond=torch.randint(low=1,high=17,size=(self.seq_length,1)) # blue ball, [seq_length, 1]
+            red_cond=torch.randn((self.seq_length,self.out_dim-1)) # red balls, [seq_length, out_dim-1]
+            blue_cond=torch.randn((self.seq_length,1)) # blue ball, [seq_length, 1]
+            # red_cond=torch.randint(low=1,high=34,size=(self.seq_length,self.out_dim-1)) # red balls, [seq_length, out_dim-1]
+            # blue_cond=torch.randint(low=1,high=17,size=(self.seq_length,1)) # blue ball, [seq_length, 1]
         
         condition[:,0:self.out_dim-1]=red_cond  # fill red balls
         condition[:,(self.out_dim-1):]=blue_cond  # fill blue ball
@@ -329,10 +329,10 @@ class LotDataset(torch.utils.data.Dataset):
         # logging.info(f'condition:{condition},x0:{x0}')
         
         # scale condition
-        pre_cond=(condition[:,0:self.out_dim-1]-self.pre_scale)/self.pre_scale
-        post_cond=(condition[:,(self.out_dim-1):]-self.post_scale)/self.post_scale
-        condition_scale=torch.cat((pre_cond, post_cond), dim=1)  # condition, [seq_length+1, out_dim]
-        condition_scale=torch.clip(condition_scale,-1.0,1.0).to(torch.float)  # ensure condition is in float format
+        # pre_cond=(condition[:,0:self.out_dim-1]-self.pre_scale)/self.pre_scale
+        # post_cond=(condition[:,(self.out_dim-1):]-self.post_scale)/self.post_scale
+        # condition_scale=torch.cat((pre_cond, post_cond), dim=1)  # condition, [seq_length+1, out_dim]
+        # condition_scale=torch.clip(condition_scale,-1.0,1.0).to(torch.float)  # ensure condition is in float format
         
         # scale x0
         pre_x0=(x0[0:self.out_dim-1]-self.pre_scale)/self.pre_scale
@@ -340,7 +340,7 @@ class LotDataset(torch.utils.data.Dataset):
         x0=torch.cat((pre_x0, post_x0), dim=0)  # [out_dim]
         x0=torch.clip(x0,-1.0,1.0).to(torch.float)
                             
-        return condition_scale, x0  # ensure the data is in float format  
+        return condition, x0  # ensure the data is in float format  
 
 # config
 class Config:
@@ -361,10 +361,10 @@ class Config:
         
         # dataset and dataloader
         self.dataset=LotDataset(data_path=self.data_path, seq_length=self.cond_seq_lenth, out_dim=self.out_dim,pre_scale=self.pre_scale, post_scale=self.post_scale)
-        self.data_loader=torch.utils.data.DataLoader(dataset=self.dataset, batch_size=1024, shuffle=True)
+        self.data_loader=torch.utils.data.DataLoader(dataset=self.dataset, batch_size=128, shuffle=True)
         
         self.lr=1e-4
-        self.epochs=15000
+        self.epochs=30000
         self.optimizer=torch.optim.Adam(self.ddpm_model.parameters(), lr=self.lr, weight_decay=1e-5)
         self.criterion=nn.MSELoss()
         self.lr_scheduler=torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(self.optimizer,T_0=10,T_mult=1,eta_min=1e-5)
@@ -417,19 +417,19 @@ def train():
         config.lr_scheduler.step()
         
         # save model
-        # if (epoch_i+1) % 10 == 0:
-        #     torch.save(ddpm_model.state_dict(), config.model_path)
-        #     logging.info(f'Model saved to {config.model_path}')
+        if (epoch_i+1) % 10 == 0:
+            torch.save(ddpm_model.state_dict(), config.model_path)
+            logging.info(f'Model saved to {config.model_path}')
         
         avg_loss = epoch_loss / len(config.data_loader)
         losses.append(avg_loss)
         logging.info(f"Epoch {epoch_i+1}/{config.epochs}, Average Loss: {avg_loss:.6f}")
 
         # save the best model
-        if avg_loss < best_loss and epoch_i > config.epochs * 0.95:
-            best_loss = avg_loss
-            torch.save(ddpm_model.state_dict(), config.model_path)
-            logging.info(f'Best model saved to {config.model_path} with loss {best_loss:.6f}')
+        # if avg_loss < best_loss and epoch_i > config.epochs * 0.95:
+        #     best_loss = avg_loss
+        #     torch.save(ddpm_model.state_dict(), config.model_path)
+        #     logging.info(f'Best model saved to {config.model_path} with loss {best_loss:.6f}')
     
     # 绘制损失曲线
     plt.figure(figsize=(10, 5))
