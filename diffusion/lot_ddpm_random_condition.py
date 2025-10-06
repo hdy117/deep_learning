@@ -339,6 +339,8 @@ class LotDataset(torch.utils.data.Dataset):
         post_x0=(x0[(self.out_dim-1):]-self.post_scale)/self.post_scale
         x0=torch.cat((pre_x0, post_x0), dim=0)  # [out_dim]
         x0=torch.clip(x0,-1.0,1.0).to(torch.float)
+        
+        # print(f'condition:{condition}, x0:{x0}')
                             
         return condition, x0  # ensure the data is in float format  
 
@@ -363,13 +365,13 @@ class Config:
         self.dataset=LotDataset(data_path=self.data_path, seq_length=self.cond_seq_lenth, out_dim=self.out_dim,pre_scale=self.pre_scale, post_scale=self.post_scale)
         self.data_loader=torch.utils.data.DataLoader(dataset=self.dataset, batch_size=128, shuffle=True)
         
-        self.lr=1e-4
+        self.lr=2e-5
         self.epochs=30000
         self.optimizer=torch.optim.Adam(self.ddpm_model.parameters(), lr=self.lr, weight_decay=1e-5)
         self.criterion=nn.MSELoss()
         self.lr_scheduler=torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(self.optimizer,T_0=10,T_mult=1,eta_min=1e-5)
         
-        self.sample_batch_size=10
+        self.sample_batch_size=5
         self.sample_dataloader:torch.utils.data.DataLoader=torch.utils.data.DataLoader(dataset=self.dataset, batch_size=self.sample_batch_size, shuffle=False)  # for sampling
         
         self.out_file='./lot_ddpm_random_condition.txt'
