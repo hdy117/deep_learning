@@ -168,8 +168,9 @@ class SinusoidalPositionEmbeddings(nn.Module):
     def forward(self, t):
         device = t.device
         half_dim = self.dim // 2
-        emb = torch.exp(torch.arange(half_dim, device=device) * 
-                       -(torch.log(torch.tensor(10000.0)) / (half_dim - 1)))
+        # 确保所有张量都在正确的设备上
+        emb = torch.exp(torch.arange(half_dim, device=device, dtype=t.dtype) * 
+                       -(torch.log(torch.tensor(10000.0, device=device, dtype=t.dtype)) / (half_dim - 1)))
         emb = t[:, None] * emb[None, :]
         emb = torch.cat([torch.sin(emb), torch.cos(emb)], dim=-1)
         return emb
@@ -186,18 +187,21 @@ class RotaryPositionEmbedding(nn.Module):
         inv_freq = 1.0 / (base ** (torch.arange(0, d_model, 2).float() / d_model))
         self.register_buffer('inv_freq', inv_freq)
         
-    def forward(self, seq_len, device):
+    def forward(self, seq_len, device, dtype=None):
         """
         生成旋转位置编码
         
         Args:
             seq_len: 序列长度
             device: 设备
+            dtype: 数据类型（可选）
         Returns:
             cos_pos: [seq_len, d_model//2] 余弦位置编码
             sin_pos: [seq_len, d_model//2] 正弦位置编码
         """
-        t = torch.arange(seq_len, device=device).type_as(self.inv_freq)
+        if dtype is None:
+            dtype = self.inv_freq.dtype
+        t = torch.arange(seq_len, device=device, dtype=dtype)
         freqs = torch.outer(t, self.inv_freq)  # [seq_len, d_model//2]
         
         # 生成旋转矩阵的 cos 和 sin 部分
@@ -456,8 +460,8 @@ class TransformerUNet1D(nn.Module):
         x_flat = self.input_proj(x_flat)  # [batch_size * in_dim, d_model]
         x = x_flat.view(batch_size, self.in_dim, self.d_model)  # [batch_size, in_dim, d_model]
         
-        # 生成 RoPE 位置编码
-        cos_pos, sin_pos = self.rope(self.in_dim, x.device)  # [in_dim, d_model//2]
+        # 生成 RoPE 位置编码（确保数据类型匹配）
+        cos_pos, sin_pos = self.rope(self.in_dim, x.device, dtype=x.dtype)  # [in_dim, d_model//2]
         
         # 时间步嵌入
         t_embedding = self.t_embedding(timestep)  # [batch_size, embedding_dim]
@@ -609,7 +613,7 @@ class Config:
         
         # 训练配置
         self.lr = 1e-4
-        self.epochs = 300
+        self.epochs = 150
         self.optimizer = torch.optim.Adam(
             self.unet.parameters(), 
             lr=self.lr, 
@@ -761,9 +765,11 @@ def sample():
         latents = noise
         for t in noise_scheduler.timesteps:
             # 为CFG准备：将批次大小翻倍
-            latent_model_input = torch.cat([latents] * 2)
-            timestep = t.repeat(2)
-            condition_concat = torch.cat([condition, torch.zeros_like(condition)], dim=0)
+            latent_model_input = torch.cat([latents] * 2)  # [batch_size * 2, out_dim]
+            # 确保 timestep 在正确的设备上，并且匹配翻倍后的批次大小
+            batch_size_doubled = latent_model_input.shape[0]  # batch_size * 2
+            timestep = t.expand(batch_size_doubled).to(config.device)  # [batch_size * 2]
+            condition_concat = torch.cat([condition, torch.zeros_like(condition)], dim=0)  # [batch_size * 2, seq_len, cond_dim]
             
             # 预测噪声
             noise_pred = unet(
