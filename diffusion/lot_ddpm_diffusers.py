@@ -10,6 +10,7 @@ import os
 import tqdm
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 import argparse
 import logging
 
@@ -313,7 +314,15 @@ class LotDataset(torch.utils.data.Dataset):
     def __init__(self, data_path='./data/lot_data.csv', seq_length=72, out_dim=7, pre_scale=16.5, post_scale=8.0):
         super().__init__()
         self.data_path = data_path
-        self.data = pd.read_csv(self.data_path)
+        data_df = pd.read_csv(self.data_path)
+        
+        # Convert to numpy array for faster access (vectorized operations)
+        # Extract all columns in order: red_ball_0 to red_ball_5, then blue_ball_0
+        self.data = np.zeros((len(data_df), out_dim), dtype=np.float32)
+        for ii in range(out_dim-1):
+            self.data[:, ii] = data_df[f'red_ball_{ii}'].values
+        self.data[:, out_dim-1] = data_df[f'blue_ball_0'].values
+        
         self.seq_length = seq_length
         self.out_dim = out_dim
         self.pre_scale = pre_scale
@@ -325,14 +334,10 @@ class LotDataset(torch.utils.data.Dataset):
         return self.dataset_length
 
     def __getitem__(self, idx):
-        condition = torch.zeros((self.seq_length+1, self.out_dim))
-        for i in range(self.seq_length+1):
-            item_list = []
-            for ii in range(self.out_dim-1):
-                item = int(self.data[f'red_ball_{ii}'].iloc[idx+i])
-                item_list.append(item)
-            item_list.append(int(self.data[f'blue_ball_0'].iloc[idx+i]))
-            condition[i] = torch.tensor(item_list, dtype=torch.float)
+        # Vectorized data loading: extract (seq_length+1) rows at once
+        # This is much faster than looping with pandas iloc
+        condition_data = self.data[idx:idx+self.seq_length+1]  # [seq_length+1, out_dim]
+        condition = torch.from_numpy(condition_data).float()  # [seq_length+1, out_dim]
         
         # 标准化条件
         pre_cond = (condition[:, 0:self.out_dim-1] - self.pre_scale) / self.pre_scale
@@ -407,7 +412,7 @@ class Config:
         
         # 训练配置
         self.lr = 1e-4
-        self.epochs = 3000
+        self.epochs = 1637
         self.optimizer = torch.optim.Adam(
             self.unet.parameters(), 
             lr=self.lr, 
