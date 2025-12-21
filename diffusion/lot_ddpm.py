@@ -352,12 +352,12 @@ class Config:
         self.data_loader=torch.utils.data.DataLoader(dataset=self.dataset, batch_size=128, shuffle=True)
         
         self.lr=1e-4
-        self.epochs=500
+        self.epochs=637
         self.optimizer=torch.optim.Adam(self.ddpm_model.parameters(), lr=self.lr, weight_decay=1e-5)
         self.criterion=nn.MSELoss()
         self.lr_scheduler=torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(self.optimizer,T_0=10,T_mult=1,eta_min=1e-5)
         
-        self.sample_batch_size=30
+        self.sample_batch_size=20
         self.out_file='./lot_ddpm.txt'
 
 # training loop
@@ -411,11 +411,11 @@ def train():
         losses.append(avg_loss)
         logging.info(f"Epoch {epoch_i+1}/{config.epochs}, Average Loss: {avg_loss:.6f}")
 
-        # # save the best model
-        # if avg_loss < best_loss and epoch_i > config.epochs * 0.8:
-        #     best_loss = avg_loss
-        #     torch.save(ddpm_model.state_dict(), config.model_path)
-        #     logging.info(f'Best model saved to {config.model_path} with loss {best_loss:.6f}')
+        # save the best model
+        if avg_loss < best_loss and epoch_i > config.epochs * 0.8:
+            best_loss = avg_loss
+            torch.save(ddpm_model.state_dict(), config.model_path)
+            logging.info(f'Best model saved to {config.model_path} with loss {best_loss:.6f}')
     
     # 绘制损失曲线
     plt.figure(figsize=(10, 5))
