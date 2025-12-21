@@ -6,6 +6,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import math
 import os
 import tqdm
 import matplotlib.pyplot as plt
@@ -155,7 +156,7 @@ class ConditionalEncoder(nn.Module):
         return encoder_outputs.last_hidden_state[:, 0]  # [batch_size, model_dim]
 
 # =============================================================================
-# 自定义 UNet1D 模型（兼容 diffusers）
+# 基于 Transformer 的扩散模型（兼容 diffusers）
 # =============================================================================
 
 class SinusoidalPositionEmbeddings(nn.Module):
@@ -173,44 +174,218 @@ class SinusoidalPositionEmbeddings(nn.Module):
         emb = torch.cat([torch.sin(emb), torch.cos(emb)], dim=-1)
         return emb
 
-class LinearBlock(nn.Module):
-    """线性残差块，用于UNet架构中的特征处理"""
-    def __init__(self, im_dim, out_dim, embedding_dim=128):
+class RotaryPositionEmbedding(nn.Module):
+    """旋转位置编码 (RoPE - Rotary Position Embedding)"""
+    def __init__(self, d_model, max_len=100, base=10000.0):
         super().__init__()
-        self.block = nn.Sequential(
-            nn.Linear(im_dim, out_dim),
-            nn.LayerNorm(out_dim),
-            nn.GELU(),
-            nn.Linear(out_dim, out_dim),
-            nn.LayerNorm(out_dim),
-            nn.GELU(),
-            nn.Linear(out_dim, out_dim),
-        )
-        self.embedding_proj = nn.Linear(embedding_dim, im_dim)
-        self.short_cut = nn.Linear(im_dim, out_dim) if im_dim != out_dim else nn.Identity()
+        self.d_model = d_model
+        self.max_len = max_len
+        self.base = base
         
-        self.out_activation = nn.Sequential(
-            nn.LayerNorm(out_dim),
-            nn.GELU(),
-        )
-
-    def forward(self, x, embedding): 
-        embedding_proj = self.embedding_proj(embedding)
-        x = x + embedding_proj
+        # 计算频率
+        inv_freq = 1.0 / (base ** (torch.arange(0, d_model, 2).float() / d_model))
+        self.register_buffer('inv_freq', inv_freq)
         
-        x_short = self.short_cut(x)
-        x = self.block(x)
-        x = x + x_short
+    def forward(self, seq_len, device):
+        """
+        生成旋转位置编码
+        
+        Args:
+            seq_len: 序列长度
+            device: 设备
+        Returns:
+            cos_pos: [seq_len, d_model//2] 余弦位置编码
+            sin_pos: [seq_len, d_model//2] 正弦位置编码
+        """
+        t = torch.arange(seq_len, device=device).type_as(self.inv_freq)
+        freqs = torch.outer(t, self.inv_freq)  # [seq_len, d_model//2]
+        
+        # 生成旋转矩阵的 cos 和 sin 部分
+        cos_pos = freqs.cos()  # [seq_len, d_model//2]
+        sin_pos = freqs.sin()  # [seq_len, d_model//2]
+        
+        return cos_pos, sin_pos
+    
+    def apply_rotary_pos_emb(self, x, cos_pos, sin_pos):
+        """
+        应用旋转位置编码到输入张量
+        
+        Args:
+            x: [batch_size, seq_len, d_model] 输入张量
+            cos_pos: [seq_len, d_model//2] 余弦位置编码
+            sin_pos: [seq_len, d_model//2] 正弦位置编码
+        Returns:
+            [batch_size, seq_len, d_model] 旋转后的张量
+        """
+        batch_size, seq_len, d_model = x.shape
+        half_dim = d_model // 2
+        
+        # 将 x 分成两部分
+        x1, x2 = x[..., :half_dim], x[..., half_dim:]
+        
+        # 应用旋转
+        rotated_x1 = x1 * cos_pos.unsqueeze(0) - x2 * sin_pos.unsqueeze(0)
+        rotated_x2 = x1 * sin_pos.unsqueeze(0) + x2 * cos_pos.unsqueeze(0)
+        
+        # 拼接
+        rotated_x = torch.cat([rotated_x1, rotated_x2], dim=-1)
+        
+        return rotated_x
 
-        return self.out_activation(x)
+class TransformerDiffusionBlock(nn.Module):
+    """基于 Transformer 的扩散块，包含自注意力和交叉注意力（使用 RoPE）"""
+    def __init__(self, d_model, nhead=8, dim_feedforward=512, dropout=0.1):
+        super().__init__()
+        self.d_model = d_model
+        self.nhead = nhead
+        self.head_dim = d_model // nhead
+        
+        assert d_model % nhead == 0, "d_model must be divisible by nhead"
+        
+        # Query, Key, Value 投影层
+        self.q_proj = nn.Linear(d_model, d_model)
+        self.k_proj = nn.Linear(d_model, d_model)
+        self.v_proj = nn.Linear(d_model, d_model)
+        self.out_proj = nn.Linear(d_model, d_model)
+        
+        # 交叉注意力的投影层
+        self.q_cross_proj = nn.Linear(d_model, d_model)
+        self.k_cross_proj = nn.Linear(d_model, d_model)
+        self.v_cross_proj = nn.Linear(d_model, d_model)
+        self.out_cross_proj = nn.Linear(d_model, d_model)
+        
+        # 前馈网络
+        self.ffn = nn.Sequential(
+            nn.Linear(d_model, dim_feedforward),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim_feedforward, d_model),
+            nn.Dropout(dropout)
+        )
+        
+        # 层归一化
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.norm3 = nn.LayerNorm(d_model)
+        
+        # Dropout
+        self.dropout = nn.Dropout(dropout)
+        self.attn_dropout = nn.Dropout(dropout)
+        
+    def apply_rotary_pos_emb(self, x, cos_pos, sin_pos):
+        """应用 RoPE 到输入张量"""
+        batch_size, seq_len, d_model = x.shape
+        half_dim = d_model // 2
+        
+        # 将 x 分成两部分
+        x1, x2 = x[..., :half_dim], x[..., half_dim:]
+        
+        # 应用旋转
+        rotated_x1 = x1 * cos_pos.unsqueeze(0) - x2 * sin_pos.unsqueeze(0)
+        rotated_x2 = x1 * sin_pos.unsqueeze(0) + x2 * cos_pos.unsqueeze(0)
+        
+        # 拼接
+        rotated_x = torch.cat([rotated_x1, rotated_x2], dim=-1)
+        
+        return rotated_x
+    
+    def scaled_dot_product_attention(self, q, k, v, dropout=None):
+        """缩放点积注意力"""
+        d_k = q.size(-1)
+        scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(d_k)
+        
+        if dropout is not None:
+            scores = dropout(scores)
+        
+        attn_weights = F.softmax(scores, dim=-1)
+        output = torch.matmul(attn_weights, v)
+        
+        return output, attn_weights
+    
+    def forward(self, x, cond_emb=None, cos_pos=None, sin_pos=None):
+        """
+        Args:
+            x: [batch_size, seq_len, d_model] 输入序列
+            cond_emb: [batch_size, d_model] 条件嵌入（可选）
+            cos_pos: [seq_len, d_model//2] RoPE 余弦位置编码
+            sin_pos: [seq_len, d_model//2] RoPE 正弦位置编码
+        Returns:
+            [batch_size, seq_len, d_model] 输出序列
+        """
+        batch_size, seq_len, d_model = x.shape
+        
+        # 自注意力
+        residual = x
+        x = self.norm1(x)
+        
+        # 投影到 Q, K, V
+        q = self.q_proj(x)  # [batch_size, seq_len, d_model]
+        k = self.k_proj(x)
+        v = self.v_proj(x)
+        
+        # 应用 RoPE（如果有）
+        if cos_pos is not None and sin_pos is not None:
+            q = self.apply_rotary_pos_emb(q, cos_pos, sin_pos)
+            k = self.apply_rotary_pos_emb(k, cos_pos, sin_pos)
+        
+        # Reshape 为多头形式
+        q = q.view(batch_size, seq_len, self.nhead, self.head_dim).transpose(1, 2)  # [batch_size, nhead, seq_len, head_dim]
+        k = k.view(batch_size, seq_len, self.nhead, self.head_dim).transpose(1, 2)
+        v = v.view(batch_size, seq_len, self.nhead, self.head_dim).transpose(1, 2)
+        
+        # 计算注意力
+        x_attn, _ = self.scaled_dot_product_attention(q, k, v, self.attn_dropout)
+        
+        # Reshape 回原始形状
+        x_attn = x_attn.transpose(1, 2).contiguous().view(batch_size, seq_len, d_model)
+        x_attn = self.out_proj(x_attn)
+        
+        x = residual + self.dropout(x_attn)
+        
+        # 交叉注意力（如果有条件嵌入）
+        if cond_emb is not None:
+            residual = x
+            x = self.norm2(x)
+            
+            # 将条件嵌入扩展为序列形式
+            cond_seq = cond_emb.unsqueeze(1)  # [batch_size, 1, d_model]
+            
+            # 投影
+            q_cross = self.q_cross_proj(x)  # [batch_size, seq_len, d_model]
+            k_cross = self.k_cross_proj(cond_seq)  # [batch_size, 1, d_model]
+            v_cross = self.v_cross_proj(cond_seq)  # [batch_size, 1, d_model]
+            
+            # Reshape 为多头形式
+            q_cross = q_cross.view(batch_size, seq_len, self.nhead, self.head_dim).transpose(1, 2)
+            k_cross = k_cross.view(batch_size, 1, self.nhead, self.head_dim).transpose(1, 2)
+            v_cross = v_cross.view(batch_size, 1, self.nhead, self.head_dim).transpose(1, 2)
+            
+            # 计算交叉注意力
+            x_cross, _ = self.scaled_dot_product_attention(q_cross, k_cross, v_cross, self.attn_dropout)
+            
+            # Reshape 回原始形状
+            x_cross = x_cross.transpose(1, 2).contiguous().view(batch_size, seq_len, d_model)
+            x_cross = self.out_cross_proj(x_cross)
+            
+            x = residual + self.dropout(x_cross)
+        else:
+            x = self.norm2(x)
+        
+        # 前馈网络
+        residual = x
+        x = self.norm3(x)
+        x = residual + self.ffn(x)
+        
+        return x
 
-class UNet1D(nn.Module):
-    """一维UNet网络，用于扩散模型的噪声预测（兼容diffusers）"""
-    def __init__(self, in_dim=7, base_dim=32, embedding_dim=128, num_cond_feature=7):
+class TransformerUNet1D(nn.Module):
+    """基于 Transformer 的一维扩散模型（兼容diffusers）"""
+    def __init__(self, in_dim=7, d_model=256, nhead=8, num_layers=6, 
+                 dim_feedforward=1024, embedding_dim=256, num_cond_feature=7, dropout=0.1):
         super().__init__()
         
         self.in_dim = in_dim
-        self.base_dim = base_dim
+        self.d_model = d_model
         self.embedding_dim = embedding_dim
         
         # 时间步嵌入网络
@@ -225,32 +400,40 @@ class UNet1D(nn.Module):
         self.condition_embedding = ConditionalEncoder(
             input_dim=num_cond_feature, 
             model_dim=embedding_dim
-        ) 
-    
-        # 初始投影层
-        self.init_proj = nn.Sequential(
-            nn.Linear(in_dim, base_dim),
-            nn.GELU(),
         )
         
-        # 下采样块
-        self.down1 = LinearBlock(base_dim, base_dim * 2, embedding_dim=embedding_dim)
-        self.down2 = LinearBlock(base_dim * 2, base_dim * 4, embedding_dim=embedding_dim)
-        self.down3 = LinearBlock(base_dim * 4, base_dim * 8, embedding_dim=embedding_dim)
-
-        # 瓶颈层
-        self.bottleneck = LinearBlock(base_dim * 8, base_dim * 8, embedding_dim=embedding_dim)
+        # 输入投影：将每个特征维度投影到模型维度
+        # 输入是 [batch_size, in_dim]，需要转换为 [batch_size, in_dim, d_model]
+        # 每个特征维度作为一个token
+        self.input_proj = nn.Sequential(
+            nn.Linear(1, d_model),  # 将每个特征值投影到d_model维度
+            nn.LayerNorm(d_model),
+        )
         
-        # 上采样块
-        self.up1 = LinearBlock(base_dim * 16, base_dim * 4, embedding_dim=embedding_dim)
-        self.up2 = LinearBlock(base_dim * 8, base_dim * 2, embedding_dim=embedding_dim)
-        self.up3 = LinearBlock(base_dim * 4, base_dim * 1, embedding_dim=embedding_dim)
-
+        # RoPE 位置编码
+        self.rope = RotaryPositionEmbedding(d_model, max_len=in_dim)
+        
+        # 时间步和条件嵌入的投影层
+        self.embedding_proj = nn.Linear(embedding_dim, d_model)
+        
+        # Transformer 层堆叠
+        self.transformer_layers = nn.ModuleList([
+            TransformerDiffusionBlock(
+                d_model=d_model,
+                nhead=nhead,
+                dim_feedforward=dim_feedforward,
+                dropout=dropout
+            ) for _ in range(num_layers)
+        ])
+        
         # 输出投影层
-        self.out_proj = nn.Sequential(
-            nn.Linear(base_dim, in_dim), 
+        self.output_proj = nn.Sequential(
+            nn.LayerNorm(d_model),
+            nn.Linear(d_model, d_model),
+            nn.GELU(),
+            nn.Linear(d_model, 1),  # 输出单个值
         )
-
+        
     def forward(self, sample, timestep, encoder_hidden_states=None, return_dict=True):
         """
         前向传播，预测噪声（兼容diffusers接口）
@@ -261,44 +444,54 @@ class UNet1D(nn.Module):
             encoder_hidden_states: 条件序列，形状为 [batch_size, sequence, condition_dim]
             return_dict: 是否返回字典格式
         """
-        x = sample
-        t = timestep
+        batch_size = sample.size(0)
         
-        # 初始投影
-        x = self.init_proj(x)
+        # 将输入转换为序列形式：[batch_size, in_dim] -> [batch_size, in_dim, 1]
+        # 每个特征维度作为一个序列位置（token）
+        x = sample.unsqueeze(-1)  # [batch_size, in_dim, 1]
+        
+        # 输入投影：将每个特征值投影到d_model维度
+        # 需要reshape为 [batch_size * in_dim, 1] 进行投影，然后reshape回 [batch_size, in_dim, d_model]
+        x_flat = x.view(-1, 1)  # [batch_size * in_dim, 1]
+        x_flat = self.input_proj(x_flat)  # [batch_size * in_dim, d_model]
+        x = x_flat.view(batch_size, self.in_dim, self.d_model)  # [batch_size, in_dim, d_model]
+        
+        # 生成 RoPE 位置编码
+        cos_pos, sin_pos = self.rope(self.in_dim, x.device)  # [in_dim, d_model//2]
         
         # 时间步嵌入
-        t_embedding = self.t_embedding(t)
+        t_embedding = self.t_embedding(timestep)  # [batch_size, embedding_dim]
         
         # 条件嵌入
         if encoder_hidden_states is not None:
-            cond_embedding = self.condition_embedding(encoder_hidden_states)
+            cond_embedding = self.condition_embedding(encoder_hidden_states)  # [batch_size, embedding_dim]
         else:
             cond_embedding = torch.zeros_like(t_embedding)
         
-        # 融合嵌入
-        embeddings = t_embedding + cond_embedding
-
-        # 下采样路径
-        x1 = self.down1(x, embeddings)
-        x2 = self.down2(x1, embeddings)
-        x3 = self.down3(x2, embeddings)
+        # 融合时间步和条件嵌入
+        combined_embedding = t_embedding + cond_embedding  # [batch_size, embedding_dim]
+        combined_embedding = self.embedding_proj(combined_embedding)  # [batch_size, d_model]
         
-        # 瓶颈层
-        x4 = self.bottleneck(x3, embeddings)
-
-        # 上采样路径
-        x = self.up1(torch.cat([x4, x3], dim=1), embeddings)
-        x = self.up2(torch.cat([x, x2], dim=1), embeddings)
-        x = self.up3(torch.cat([x, x1], dim=1), embeddings)
-
-        # 输出投影
-        noise_pred = self.out_proj(x)
+        # 将嵌入添加到每个序列位置（广播）
+        x = x + combined_embedding.unsqueeze(1)  # [batch_size, in_dim, d_model]
+        
+        # 通过 Transformer 层（传入 RoPE 位置编码）
+        for layer in self.transformer_layers:
+            x = layer(x, combined_embedding, cos_pos, sin_pos)
+        
+        # 输出投影：将每个token投影回单个值
+        # x: [batch_size, in_dim, d_model]
+        x_flat = x.view(-1, self.d_model)  # [batch_size * in_dim, d_model]
+        x_flat = self.output_proj(x_flat)  # [batch_size * in_dim, 1]
+        noise_pred = x_flat.view(batch_size, self.in_dim)  # [batch_size, in_dim]
         
         if return_dict:
             return UNet1DOutput(sample=noise_pred)
         else:
             return noise_pred
+
+# 为了保持兼容性，将 UNet1D 重命名为 TransformerUNet1D，但保留 UNet1D 作为别名
+UNet1D = TransformerUNet1D
 
 @dataclass
 class UNet1DOutput(BaseOutput):
@@ -379,12 +572,16 @@ class Config:
         self.out_dim = 7
         self.ddpm_scheduler_steps = 1000
         
-        # 初始化UNet模型
-        self.unet = UNet1D(
+        # 初始化基于 Transformer 的 UNet 模型
+        self.unet = TransformerUNet1D(
             in_dim=self.out_dim, 
-            base_dim=64, 
-            embedding_dim=256, 
-            num_cond_feature=self.condition_feature_dim
+            d_model=256,           # Transformer 模型维度
+            nhead=8,                # 注意力头数
+            num_layers=6,           # Transformer 层数
+            dim_feedforward=1024,   # 前馈网络维度
+            embedding_dim=256,      # 时间步和条件嵌入维度
+            num_cond_feature=self.condition_feature_dim,
+            dropout=0.1
         ).to(self.device)
         
         # 初始化diffusers调度器
@@ -412,7 +609,7 @@ class Config:
         
         # 训练配置
         self.lr = 1e-4
-        self.epochs = 1637
+        self.epochs = 300
         self.optimizer = torch.optim.Adam(
             self.unet.parameters(), 
             lr=self.lr, 
