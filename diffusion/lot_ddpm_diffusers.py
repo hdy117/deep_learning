@@ -613,7 +613,7 @@ class Config:
         
         # 训练配置
         self.lr = 1e-4
-        self.epochs = 150
+        self.epochs = 800
         self.optimizer = torch.optim.Adam(
             self.unet.parameters(), 
             lr=self.lr, 
@@ -702,9 +702,14 @@ def train():
         config.lr_scheduler.step()
         
         # 定期保存模型
-        if (epoch_i+1) % 10 == 0:
+        # if (epoch_i+1) % 10 == 0:
+        #     torch.save(unet.state_dict(), config.model_path)
+        #     logging.info(f'Model saved to {config.model_path}')
+        
+        if epoch_loss < best_loss and epoch_i >= int(config.epochs*0.8):
             torch.save(unet.state_dict(), config.model_path)
-            logging.info(f'Model saved to {config.model_path}')
+            best_loss = epoch_loss
+            logging.info(f'Model saved to {config.model_path} with loss {best_loss}')
         
         # 记录平均损失
         avg_loss = epoch_loss / len(config.data_loader)
