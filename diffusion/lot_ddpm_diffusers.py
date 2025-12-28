@@ -613,7 +613,7 @@ class Config:
         
         # 训练配置
         self.lr = 1e-4
-        self.epochs = 1600
+        self.epochs = 3200
         self.optimizer = torch.optim.Adam(
             self.unet.parameters(), 
             lr=self.lr, 
