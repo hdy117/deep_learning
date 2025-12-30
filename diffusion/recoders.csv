@@ -1,3 +1,3 @@
-ddpm_lot_diffusers_1600.pth,ddpm_lot_diffusers_800.pth 
-0+1,0+0
-4+0,
+ddpm_lot_diffusers_9600.pth,ddpm_lot_diffusers_3200.pth,ddpm_lot_diffusers_1600.pth,ddpm_lot_diffusers_800.pth 
+0+0,0+1,0+1,0+0
+,0+1,4+0,

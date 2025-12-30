@@ -613,7 +613,7 @@ class Config:
         
         # 训练配置
         self.lr = 1e-4
-        self.epochs = 3200
+        self.epochs = 1600
         self.optimizer = torch.optim.Adam(
             self.unet.parameters(), 
             lr=self.lr, 
@@ -625,11 +625,11 @@ class Config:
         )
         
         # 采样配置
-        self.sample_batch_size = 10
+        self.sample_batch_size = 20
         self.out_file = './lot_ddpm_diffusers.txt'
         
         # CFG引导比例
-        self.guidance_scale = 3.0
+        self.guidance_scale = 2.0
 
 # =============================================================================
 # 训练和推理函数
