@@ -629,7 +629,7 @@ class Config:
         self.out_file = './lot_ddpm_diffusers.txt'
         
         # CFG引导比例
-        self.guidance_scale = 2.0
+        self.guidance_scale = 3.0
 
 # =============================================================================
 # 训练和推理函数
