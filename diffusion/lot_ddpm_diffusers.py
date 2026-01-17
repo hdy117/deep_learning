@@ -574,7 +574,7 @@ class Config:
         self.cond_seq_lenth = 72
         self.condition_feature_dim = 7
         self.out_dim = 7
-        self.ddpm_scheduler_steps = 1000
+        self.ddpm_scheduler_steps = 2000
         
         # 初始化基于 Transformer 的 UNet 模型
         self.unet = TransformerUNet1D(
@@ -613,7 +613,7 @@ class Config:
         
         # 训练配置
         self.lr = 1e-4
-        self.epochs = 1600
+        self.epochs = 16000
         self.optimizer = torch.optim.Adam(
             self.unet.parameters(), 
             lr=self.lr, 
