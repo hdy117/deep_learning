@@ -621,11 +621,7 @@ class Config:
         
         # 训练配置
         self.lr = 1e-4
-<<<<<<< HEAD
         self.epochs = 16000
-=======
-        self.epochs = 200
->>>>>>> d83f900 (add random seed)
         self.optimizer = torch.optim.Adam(
             self.unet.parameters(), 
             lr=self.lr, 
