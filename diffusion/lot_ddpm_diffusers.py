@@ -26,6 +26,14 @@ from transformers.models.bert.modeling_bert import BertEncoder, BertEmbeddings
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+random_seed=42
+torch.manual_seed(random_seed)
+np.random.seed(random_seed)
+torch.cuda.manual_seed(random_seed)
+torch.cuda.manual_seed_all(random_seed)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+
 # =============================================================================
 # 位置编码和条件编码器（使用transformers库）
 # =============================================================================
@@ -613,7 +621,11 @@ class Config:
         
         # 训练配置
         self.lr = 1e-4
+<<<<<<< HEAD
         self.epochs = 16000
+=======
+        self.epochs = 200
+>>>>>>> d83f900 (add random seed)
         self.optimizer = torch.optim.Adam(
             self.unet.parameters(), 
             lr=self.lr, 
