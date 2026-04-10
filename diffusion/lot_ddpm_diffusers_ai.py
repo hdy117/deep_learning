@@ -587,11 +587,11 @@ class Config:
         # 初始化基于 Transformer 的 UNet 模型
         self.unet = TransformerUNet1D(
             in_dim=self.out_dim, 
-            d_model=768,           # Transformer 模型维度
+            d_model=256,           # Transformer 模型维度
             nhead=8,                # 注意力头数
             num_layers=6,           # Transformer 层数
             dim_feedforward=1024,   # 前馈网络维度
-            embedding_dim=768,      # 时间步和条件嵌入维度
+            embedding_dim=256,      # 时间步和条件嵌入维度
             num_cond_feature=self.condition_feature_dim,
             dropout=0.1
         ).to(self.device)
@@ -600,12 +600,15 @@ class Config:
         self.noise_scheduler = DDPMScheduler(
             num_train_timesteps=self.ddpm_scheduler_steps,
             beta_schedule="linear",
-            beta_start=1e-4,
+            beta_start=2e-4,
             beta_end=0.02,
             prediction_type="epsilon",  # 预测噪声
         )
         
         # 数据集和数据加载器
+        self.batch_size = 128
+        self.val_batch_size = 128
+        self.train_split = 0.8
         self.dataset = LotDataset(
             data_path=self.data_path, 
             seq_length=self.cond_seq_lenth, 
@@ -613,10 +616,25 @@ class Config:
             pre_scale=self.pre_scale, 
             post_scale=self.post_scale
         )
-        self.data_loader = torch.utils.data.DataLoader(
-            dataset=self.dataset, 
-            batch_size=128, 
-            shuffle=True
+        total_len = len(self.dataset)
+        val_len = max(1, int(total_len * (1.0 - self.train_split)))
+        train_len = total_len - val_len
+        self.train_dataset, self.val_dataset = torch.utils.data.random_split(
+            self.dataset,
+            [train_len, val_len],
+            generator=torch.Generator().manual_seed(random_seed)
+        )
+        self.train_loader = torch.utils.data.DataLoader(
+            dataset=self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            drop_last=False,
+        )
+        self.val_loader = torch.utils.data.DataLoader(
+            dataset=self.val_dataset,
+            batch_size=self.val_batch_size,
+            shuffle=False,
+            drop_last=False,
         )
         
         # 训练配置
@@ -637,11 +655,47 @@ class Config:
         self.out_file = './lot_ddpm_diffusers.txt'
         
         # CFG引导比例
-        self.guidance_scale = 3.0
+        self.guidance_scale = 2.5
 
 # =============================================================================
 # 训练和推理函数
 # =============================================================================
+
+def validate(config):
+    """在验证集上评估模型损失"""
+    config.unet.eval()
+    noise_scheduler = config.noise_scheduler
+    total_loss = 0.0
+    total_samples = 0
+
+    with torch.no_grad():
+        for one_batch in config.val_loader:
+            condition = one_batch[0].to(config.device)
+            x0 = one_batch[1].to(config.device)
+            batch_size = condition.shape[0]
+
+            timesteps = torch.randint(
+                0,
+                noise_scheduler.config.num_train_timesteps,
+                (batch_size,),
+                device=config.device
+            ).long()
+            noise = torch.randn_like(x0)
+            noisy_samples = noise_scheduler.add_noise(x0, noise, timesteps)
+
+            model_output = config.unet(
+                sample=noisy_samples,
+                timestep=timesteps,
+                encoder_hidden_states=condition,
+                return_dict=True
+            ).sample
+
+            loss = config.criterion(model_output, noise)
+            total_loss += loss.item() * batch_size
+            total_samples += batch_size
+
+    return total_loss / total_samples if total_samples > 0 else 0.0
+
 
 def train():
     """训练DDPM模型（使用diffusers调度器）"""
@@ -649,6 +703,7 @@ def train():
     unet = config.unet
     noise_scheduler = config.noise_scheduler
     losses = []
+    val_losses = []
     best_loss = 1e9
     
     # 加载预训练模型（如果存在）
@@ -659,8 +714,9 @@ def train():
     
     # 训练循环
     for epoch_i in range(config.epochs):
+        unet.train()
         epoch_loss = 0.0
-        progress_bar = tqdm.tqdm(config.data_loader, desc=f"Epoch {epoch_i+1}/{config.epochs}")
+        progress_bar = tqdm.tqdm(config.train_loader, desc=f"Epoch {epoch_i+1}/{config.epochs}")
         
         for one_batch in progress_bar:
             # 清零梯度
@@ -709,27 +765,29 @@ def train():
         # 更新学习率
         config.lr_scheduler.step()
         
+        # 计算验证损失
+        val_loss = validate(config)
+        
         # 定期保存模型
-        # if (epoch_i+1) % 10 == 0:
-        #     torch.save(unet.state_dict(), config.model_path)
-        #     logging.info(f'Model saved to {config.model_path}')
-        
-        if epoch_loss < best_loss and epoch_i >= int(config.epochs*0.8):
+        if val_loss < best_loss:
             torch.save(unet.state_dict(), config.model_path)
-            best_loss = epoch_loss
-            logging.info(f'Model saved to {config.model_path} with loss {best_loss}')
+            best_loss = val_loss
+            logging.info(f'Model saved to {config.model_path} with val loss {best_loss:.6f}')
         
-        # 记录平均损失
-        avg_loss = epoch_loss / len(config.data_loader)
+        # 记录训练和验证损失
+        avg_loss = epoch_loss / len(config.train_loader)
         losses.append(avg_loss)
-        logging.info(f"Epoch {epoch_i+1}/{config.epochs}, Average Loss: {avg_loss:.6f}")
+        val_losses.append(val_loss)
+        logging.info(f"Epoch {epoch_i+1}/{config.epochs}, Train Loss: {avg_loss:.6f}, Val Loss: {val_loss:.6f}")
     
-    # 绘制并保存训练损失曲线
+    # 绘制并保存训练和验证损失曲线
     plt.figure(figsize=(10, 5))
-    plt.plot(losses)
+    plt.plot(losses, label='train')
+    plt.plot(val_losses, label='val')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
-    plt.title('Training Loss (Diffusers)')
+    plt.title('Training and Validation Loss (Diffusers)')
+    plt.legend()
     plt.savefig('./lot_ddpm_diffusers_loss_curve.png')
     plt.close()
 
