@@ -23,8 +23,17 @@ np.random.seed(RANDOM_SEED)
 if torch.cuda.is_available():
     torch.cuda.manual_seed(RANDOM_SEED)
     torch.cuda.manual_seed_all(RANDOM_SEED)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
+
+
+def configure_torch_runtime(device, deterministic=False, enable_tf32=True):
+    """按运行模式切换 PyTorch 后端配置。"""
+    if device.type != 'cuda':
+        return
+
+    torch.backends.cudnn.deterministic = deterministic
+    torch.backends.cudnn.benchmark = not deterministic
+    torch.backends.cuda.matmul.allow_tf32 = enable_tf32
+    torch.backends.cudnn.allow_tf32 = enable_tf32
 
 
 class PositionalEncoding(nn.Module):
@@ -64,6 +73,8 @@ class HistoryEncoder(nn.Module):
         self.blue_embedding = nn.Embedding(17, d_model)
         self.field_embedding = nn.Embedding(7, d_model)
         self.draw_positional_encoding = PositionalEncoding(d_model, max_len=seq_length + 1)
+        self.register_buffer('red_field_ids', torch.arange(6, dtype=torch.long).view(1, 1, 6))
+        self.register_buffer('blue_field_ids', torch.full((1, 1), 6, dtype=torch.long))
 
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=d_model,
@@ -78,15 +89,13 @@ class HistoryEncoder(nn.Module):
         self.norm = nn.LayerNorm(d_model)
 
     def forward(self, history):
-        device = history.device
-
         # 历史输入是原始离散号码，不做连续标准化。
         red_values = history[:, :, :6]
         blue_values = history[:, :, 6]
 
         # 每个字段一个固定 field id，用于标识红球位置或蓝球位置。
-        red_field_ids = torch.arange(6, device=device).view(1, 1, 6)
-        blue_field_ids = torch.full((1, 1), 6, dtype=torch.long, device=device)
+        red_field_ids = self.red_field_ids
+        blue_field_ids = self.blue_field_ids
 
         # 红球和蓝球分别走各自 embedding，再叠加字段 embedding。
         red_emb = self.red_embedding(red_values) + self.field_embedding(red_field_ids)
@@ -133,6 +142,7 @@ class AutoregressiveLotteryModel(nn.Module):
         self.seq_length = seq_length
         self.vocab_size = 50
         self.bos_token_id = 0
+        self.register_buffer('causal_mask', torch.triu(torch.full((8, 8), float('-inf')), diagonal=1))
 
         self.history_encoder = HistoryEncoder(
             d_model=d_model,
@@ -200,11 +210,9 @@ class AutoregressiveLotteryModel(nn.Module):
     def encode_history(self, history):
         return self.history_encoder(history)
 
-    @staticmethod
-    def build_causal_mask(seq_len, device):
-        """生成上三角 mask，确保 decoder 只能看见当前位置及之前的 token。"""
-        mask = torch.triu(torch.full((seq_len, seq_len), float('-inf'), device=device), diagonal=1)
-        return mask
+    def get_causal_mask(self, seq_len):
+        """返回缓存的 decoder causal mask。"""
+        return self.causal_mask[:seq_len, :seq_len]
 
     def decode_from_encoded(self, history_memory, history_context, decoder_input_tokens):
         """
@@ -220,7 +228,7 @@ class AutoregressiveLotteryModel(nn.Module):
         # 将 pooled history_context 广播到每个 target token 上，作为全局条件偏置。
         decoder_input = decoder_input + self.context_projection(history_context).unsqueeze(1)
 
-        causal_mask = self.build_causal_mask(decoder_input_tokens.size(1), decoder_input_tokens.device)
+        causal_mask = self.get_causal_mask(decoder_input_tokens.size(1))
         decoded = self.decoder(
             tgt=decoder_input,
             memory=history_memory,
@@ -353,10 +361,20 @@ class Config:
         self.model_path = os.path.join(SCRIPT_DIR, 'models', 'lot_autoregressive_classifier_scheme_a.pth')
         self.out_file = os.path.join(SCRIPT_DIR, 'lot_autoregressive_classifier_scheme_a.txt')
         self.device = DEVICE
+        self.use_deterministic = False
+        self.enable_tf32 = True
+        self.use_amp = self.device.type == 'cuda'
+        self.amp_dtype = torch.bfloat16 if self.device.type == 'cuda' and torch.cuda.is_bf16_supported() else torch.float16
+        self.num_workers = min(4, os.cpu_count() or 1)
+        self.pin_memory = self.device.type == 'cuda'
+        self.persistent_workers = self.num_workers > 0
+        self.prefetch_factor = 4 if self.num_workers > 0 else None
+        self.log_interval = 5
+        self.enable_compile = False
 
         self.cond_seq_length = 72
-        self.batch_size = 128
-        self.val_batch_size = 128
+        self.batch_size = 512 if self.device.type == 'cuda' else 128
+        self.val_batch_size = 512 if self.device.type == 'cuda' else 128
         self.lr = 1e-4
         self.epochs = 300
         self.weight_decay = 1e-5
@@ -373,6 +391,12 @@ class Config:
         self.train_ratio = 0.8
         self.split_gap = self.cond_seq_length
 
+        configure_torch_runtime(
+            self.device,
+            deterministic=self.use_deterministic,
+            enable_tf32=self.enable_tf32,
+        )
+
         self.dataset = LotAutoregressiveDataset(
             data_path=self.data_path,
             seq_length=self.cond_seq_length,
@@ -383,18 +407,34 @@ class Config:
             gap_size=self.split_gap,
         )
 
+        train_loader_kwargs = {
+            'batch_size': self.batch_size,
+            'shuffle': True,
+            'drop_last': False,
+            'num_workers': self.num_workers,
+            'pin_memory': self.pin_memory,
+        }
+        val_loader_kwargs = {
+            'batch_size': self.val_batch_size,
+            'shuffle': False,
+            'drop_last': False,
+            'num_workers': self.num_workers,
+            'pin_memory': self.pin_memory,
+        }
+        if self.num_workers > 0:
+            train_loader_kwargs['persistent_workers'] = self.persistent_workers
+            train_loader_kwargs['prefetch_factor'] = self.prefetch_factor
+            val_loader_kwargs['persistent_workers'] = self.persistent_workers
+            val_loader_kwargs['prefetch_factor'] = self.prefetch_factor
+
         # 训练集可 shuffle；验证集不 shuffle。
         self.train_loader = torch.utils.data.DataLoader(
             self.train_dataset,
-            batch_size=self.batch_size,
-            shuffle=True,
-            drop_last=False,
+            **train_loader_kwargs,
         )
         self.val_loader = torch.utils.data.DataLoader(
             self.val_dataset,
-            batch_size=self.val_batch_size,
-            shuffle=False,
-            drop_last=False,
+            **val_loader_kwargs,
         )
 
         self.model = AutoregressiveLotteryModel(
@@ -404,6 +444,8 @@ class Config:
             dropout=self.dropout,
             seq_length=self.cond_seq_length,
         ).to(self.device)
+        if self.enable_compile and hasattr(torch, 'compile'):
+            self.model = torch.compile(self.model)
         self.optimizer = torch.optim.Adam(
             self.model.parameters(),
             lr=self.lr,
@@ -417,16 +459,22 @@ class Config:
             T_mult=1,
             eta_min=1e-5,
         )
+        self.grad_scaler = torch.amp.GradScaler('cuda', enabled=self.use_amp and self.amp_dtype == torch.float16)
+
+    def autocast_context(self):
+        if not self.use_amp:
+            return torch.autocast(device_type=self.device.type, enabled=False)
+        return torch.autocast(device_type=self.device.type, dtype=self.amp_dtype)
 
 
 
 def compute_loss(config, red_logits, blue_logits, target_red, target_blue):
     """总 loss = 6 个红球位置 CE + 1 个蓝球 CE 的平均值。"""
-    red_losses = []
-    for position in range(6):
-        red_losses.append(config.red_criterion(red_logits[:, position, :], target_red[:, position]))
+    flat_red_logits = red_logits.reshape(-1, red_logits.size(-1))
+    flat_target_red = target_red.reshape(-1)
+    red_loss = config.red_criterion(flat_red_logits, flat_target_red)
     blue_loss = config.blue_criterion(blue_logits, target_blue)
-    return (sum(red_losses) + blue_loss) / 7.0
+    return (red_loss * 6.0 + blue_loss) / 7.0
 
 
 @torch.no_grad()
@@ -437,12 +485,13 @@ def validate(config):
     total_samples = 0
 
     for history, target_red, target_blue in config.val_loader:
-        history = history.to(config.device)
-        target_red = target_red.to(config.device)
-        target_blue = target_blue.to(config.device)
+        history = history.to(config.device, non_blocking=config.pin_memory)
+        target_red = target_red.to(config.device, non_blocking=config.pin_memory)
+        target_blue = target_blue.to(config.device, non_blocking=config.pin_memory)
 
-        red_logits, blue_logits = config.model(history, target_red, target_blue)
-        loss = compute_loss(config, red_logits, blue_logits, target_red, target_blue)
+        with config.autocast_context():
+            red_logits, blue_logits = config.model(history, target_red, target_blue)
+            loss = compute_loss(config, red_logits, blue_logits, target_red, target_blue)
 
         batch_size = history.size(0)
         total_loss += loss.item() * batch_size
@@ -464,19 +513,33 @@ def train():
 
     if os.path.exists(config.model_path):
         try:
-            model.load_state_dict(torch.load(config.model_path, map_location=config.device))
+            missing_keys, unexpected_keys = model.load_state_dict(
+                torch.load(config.model_path, map_location=config.device),
+                strict=False,
+            )
             model.train()
-            logging.info(f'Model loaded from {config.model_path}')
+            if missing_keys or unexpected_keys:
+                logging.info(
+                    'Checkpoint loaded with non-strict matching. missing=%s unexpected=%s',
+                    missing_keys,
+                    unexpected_keys,
+                )
+            else:
+                logging.info(f'Model loaded from {config.model_path}')
         except RuntimeError as e:
             logging.warning(f'Checkpoint at {config.model_path} is incompatible with current model structure: {e}')
             logging.warning('Training will start from randomly initialized Transformer weights.')
 
     logging.info(
-        'Dataset split: total=%d, train=%d, val=%d, gap=%d',
+        'Dataset split: total=%d, train=%d, val=%d, gap=%d, batch=%d, workers=%d, amp=%s, amp_dtype=%s',
         len(config.dataset),
         len(config.train_dataset),
         len(config.val_dataset),
         config.actual_gap,
+        config.batch_size,
+        config.num_workers,
+        config.use_amp,
+        str(config.amp_dtype).replace('torch.', ''),
     )
 
     for epoch_i in range(config.epochs):
@@ -484,22 +547,30 @@ def train():
         epoch_loss = 0.0
         progress_bar = tqdm.tqdm(config.train_loader, desc=f'Epoch {epoch_i + 1}/{config.epochs}')
 
-        for history, target_red, target_blue in progress_bar:
-            history = history.to(config.device)
-            target_red = target_red.to(config.device)
-            target_blue = target_blue.to(config.device)
+        for batch_i, (history, target_red, target_blue) in enumerate(progress_bar, start=1):
+            history = history.to(config.device, non_blocking=config.pin_memory)
+            target_red = target_red.to(config.device, non_blocking=config.pin_memory)
+            target_blue = target_blue.to(config.device, non_blocking=config.pin_memory)
 
-            config.optimizer.zero_grad()
-            red_logits, blue_logits = model(history, target_red, target_blue)
-            loss = compute_loss(config, red_logits, blue_logits, target_red, target_blue)
-            loss.backward()
+            config.optimizer.zero_grad(set_to_none=True)
+            with config.autocast_context():
+                red_logits, blue_logits = model(history, target_red, target_blue)
+                loss = compute_loss(config, red_logits, blue_logits, target_red, target_blue)
 
-            # 轻量梯度裁剪，避免训练后期梯度不稳定。
-            nn.utils.clip_grad_norm_(model.parameters(), config.gradient_clip)
-            config.optimizer.step()
+            if config.grad_scaler.is_enabled():
+                config.grad_scaler.scale(loss).backward()
+                config.grad_scaler.unscale_(config.optimizer)
+                nn.utils.clip_grad_norm_(model.parameters(), config.gradient_clip)
+                config.grad_scaler.step(config.optimizer)
+                config.grad_scaler.update()
+            else:
+                loss.backward()
+                nn.utils.clip_grad_norm_(model.parameters(), config.gradient_clip)
+                config.optimizer.step()
 
             epoch_loss += loss.item()
-            progress_bar.set_postfix(loss=loss.item())
+            if batch_i % config.log_interval == 0 or batch_i == len(config.train_loader):
+                progress_bar.set_postfix(loss=f'{loss.item():.4f}')
 
         config.lr_scheduler.step()
         val_loss = validate(config)
@@ -580,9 +651,19 @@ def sample():
 
     if os.path.exists(config.model_path):
         try:
-            model.load_state_dict(torch.load(config.model_path, map_location=config.device))
+            missing_keys, unexpected_keys = model.load_state_dict(
+                torch.load(config.model_path, map_location=config.device),
+                strict=False,
+            )
             model.eval()
-            logging.info(f'Model loaded from {config.model_path}')
+            if missing_keys or unexpected_keys:
+                logging.info(
+                    'Checkpoint loaded with non-strict matching. missing=%s unexpected=%s',
+                    missing_keys,
+                    unexpected_keys,
+                )
+            else:
+                logging.info(f'Model loaded from {config.model_path}')
         except RuntimeError as e:
             logging.warning(f'Checkpoint at {config.model_path} is incompatible with current model structure: {e}')
             logging.warning('Please rerun --train to create a Transformer checkpoint before sampling.')
