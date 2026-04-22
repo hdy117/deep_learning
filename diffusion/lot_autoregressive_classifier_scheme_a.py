@@ -373,20 +373,20 @@ class Config:
         self.enable_compile = False
 
         self.cond_seq_length = 72
-        self.batch_size = 512 if self.device.type == 'cuda' else 128
+        self.batch_size = 256 if self.device.type == 'cuda' else 128
         self.val_batch_size = 256 if self.device.type == 'cuda' else 128
-        self.lr = 1e-4
-        self.epochs = 18
+        self.lr = 2e-4
+        self.epochs = 30 # 20
         self.weight_decay = 1e-5
         self.gradient_clip = 1.0
 
-        self.d_model = 256
+        self.d_model = 128
         self.nhead = 8
-        self.num_layers = 6
+        self.num_layers = 12
         self.dropout = 0.1
 
-        self.sample_batch_size = 30
-        self.temperature = 0.6
+        self.sample_batch_size = 20
+        self.temperature = 0.3
         self.top_k = 0
         self.train_ratio = 0.8
         self.split_gap = self.cond_seq_length
